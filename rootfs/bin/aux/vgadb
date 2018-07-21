@@ -1,0 +1,82 @@
+# VGA database.
+#
+# ctlr:
+# These entries are used to identify a particular controller.
+# 'numeric offset'="string" identifies the controller by searching
+# the BIOS for "string" at 'offset'. There may be multiple identifier
+# attributes per ctlr.
+# Strings can be found in the BIOS ROM by using the DOS 'debug'
+# command and typing 'd c000:0' to obtain a dump of the first part of
+# the ROM. Note that some machines (e.g. AT&T/NCR laptops) have the
+# ROM mapped at 0xE0000, not 0xC0000.
+# The "clock", "ctlr", "link" and "ramdac" entries give a chain in order
+# of functions to be called for this controller for initialisation, etc.
+# The "clock", "ctlr", "link" and "ramdac" values can all take an extension
+# following a '-'. This can be used as a speed-grade or subtype; matching
+# is done without the extension.
+#
+
+ctlr
+	0xC0000="ctlr:vga"
+	hwgc=soft
+	ctlr=vga linear=1
+
+ctlr
+	0xC0000="ctlr:vesa"
+	hwgc=soft
+	ctlr=vesa linear=1
+
+ctlr
+	0xC0000="ctlr:qemustd"
+#	0xC0006="Plex86/Bochs VGABios "
+	hwgc=soft
+	ctlr=qemustd linear=1
+
+#
+# mode:
+# These entries specify a monitor operating mode.
+# Attributes are:
+#	clock		the dot clock in MHz
+#	shb		start horizontal blanking
+#	ehb		end horizontal blanking
+#	ht		horizontal total
+#	vrs		vertical refresh start
+#	vre		vertical refresh end
+#	vt		vertical total
+#	hsync		horizontal sync polarity
+#	vsync		vertical sync polarity
+#	interlace	interlace
+# The shb, ehb, ht, vrs, vre and vt attributes specify the horizontal and
+# vertical timing. The x (hde, horizontal display end), y (vde, vertical
+# display end) and z (depth) values are derived from the value of the main
+# attribute (e.g. 640x480x8 -> x=640, y=480, z=8).
+#
+# The clock value 25.175 is known internally as the baseline VGA clock rate.
+#
+# The defaults for hsync, vsync and interlace are 0. Both hsync and vsync
+# must be non-zero if either is to take effect, - and + are valid choices.
+#
+# An attribute 'include=val' means continue using another entry. In this
+# case any non-zero attributes already set will not be overwritten by the
+# jumped-to mode. The x, y and z values are fixed by the first mode.
+#
+# An attribute 'alias=val' means continue using another monitor type. It can
+# be used to chain classes together. (bad explanation, i know).
+#
+
+
+#
+# QVGA		320x240		Quarter Video Graphics Array
+# VGA		640x480		Video Graphics Array
+# SVGA		800x600		Super Video Graphics Array
+# XGA		1024x768	eXtended Graphics Array
+# SXGA		1280x1024	Super eXtended Graphics Array
+# SXGA+		1400x1050
+# UXGA		1600x1200	Ultra eXtended Graphics Array
+# QXGA		2048x1536	Quad XGA 
+# QSXGA		2560x2048	Quad SXGA 
+# QUXGA		3200x2400	Quad UXGA
+# QUXGA-W	3840x2400	Wide-QUXGA
+#
+
+

@@ -1,0 +1,18 @@
+#!/bin/rc
+
+echo  ----riostart----
+
+dir = /mnt/wsys
+srv = $wsys
+
+# echo $wsys
+echo   mount $wsys /mnt/wsys N7,10,10,400,300
+
+#rfork ne
+#{
+	mount  $wsys  /mnt/wsys  N7,10,10,400,300
+	bind -b /mnt/wsys  /dev
+	cat  /bin/riostart 
+#	exec /bin/rc -i 
+	exec /bin/rc -i < /dev/cons > /dev/cons >[2] /dev/cons
+#}

@@ -1,0 +1,44 @@
+    "#--- root ---\n"
+       "#  mount -aC #s/boot /root \n"
+       "#  bind -a /root /\n"
+       "#  bind -c /root/mnt /mnt\n"
+
+    "#--- kernel devices ---\n"
+    "bind #c /dev\n"
+    "bind #d /fd\n"
+    "bind -c #e /env\n"
+    "bind #p /proc\n"
+    "bind -c #s /srv\n"
+      "#  bind -a #ESC$BB$ESC(B /dev\n"
+    "bind -a #S /dev\n"
+
+    "bind -ac #R /\n"
+
+    "mount -a /srv/9660 /t /dev/sdD0/data\n"
+    
+    "#--- mount points ---\n"
+        "#  mount /srv/slashn /n\n"
+
+    "#--- authentication ---\n"
+        "#  mount -a /srv/factotum /mnt\n"
+
+    "#--- standard bin ---\n"
+        "#  bind /t/bin /bin\n"
+        "#  bind /$cputype/bin /bin\n"
+        "#  bind -a /rc/bin /bin\n"
+
+    "#--- internal networks ---\n"
+        "#  mount -a /srv/ip /net\n"
+    "bind -a #l /net\n"
+    "bind -a #I /net\n"
+        "#  mount -a /srv/cs /net\n"
+        "#  mount -a /srv/dns /net\n"
+        "#  mount -a /srv/net /net\n"
+    
+    //    "bind -c /usr/$user/tmp /tmp\n"
+    //    "cd /usr/$user\n"
+
+    //    ". /lib/namespace.local\n"
+    //    ". /lib/namespace.$sysname\n"
+
+

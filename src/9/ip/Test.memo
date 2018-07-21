@@ -1,0 +1,27 @@
+========= ping responce =============== 
+[/] bind -a #l net
+
+
+[/] bind -a #I0 net
+
+
+[/] open -w /net/ipifc/clone 
+  -- returns --> fd:0
+
+[/] write 0 bind ether /net/ether
+
+
+[/] write 0 add 192.168.74.100 255:255:255:0
+
+                                        [host]: ping 192.168.74.100 
+
+
+========== announce =================
+
+[/] open -w /net/tcp/clone
+   -- returns -->  fd:1
+
+[/] write 1 announce 80
+  
+                                       [host]: telnet 192.168.74.100 80
+

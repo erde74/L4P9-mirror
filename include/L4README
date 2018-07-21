@@ -1,0 +1,19 @@
+<><> L4 pistachio <><>
+
+Followings are ported from L4, not from Plan9.
+
+(1) "l4" directory
+    includes header files for L4 applicatios.
+
+(2) "l4io.h" 
+    pritf(), putc(), getc(), vsnprintf() and snprintf() 
+    in L4 kernel debugger.
+
+(3) "stdarg.h"
+    defines  va_start(), va_list() and va_end() .
+
+    <-conflict->  "u.h" of Plan9.
+
+
+
+ 

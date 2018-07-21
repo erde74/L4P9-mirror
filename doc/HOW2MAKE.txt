@@ -1,0 +1,213 @@
+*=============================================*
+|     How to make  executables                |
+|                                             |
+*=============================================*
+
+<<< Directory structure >>>
+
+LP49-yymmdd/
+
+		doc/
+
+		include/
+
+		lib/	  --- symbolic links to libxxx.a files
+
+		rootfs/
+			bin/    --- LP49 command files
+				Makefile    -- build cmd.zip
+				cmd.zip
+				....        -- command files
+
+			boot/   --- LP49 
+				hvm.gz
+				pc.gz
+				qsh.gz
+				dossrv.gz
+
+
+		src/     --- Source files
+
+			Makefie  --- just "make clean; make"
+
+			9/   
+				hvm/   
+				pc/
+				port/
+				ip/
+				qsh/
+
+
+			cmd/  --- Command source files
+
+				bin/
+				ext2fs/
+				....
+				simple/
+				test/
+				usb/
+
+			lib*/
+			
+
+
+<<< Makefiles >>>
+
+	LP49-yymmdd/src/Makefile
+
+	LP49-yymmdd/src/9/hvm/Makefile
+	LP49-yymmdd/src/9/pc/Makefile
+	LP49-yymmdd/src/9/qsh/Makefile
+
+	LP49-yymmdd/src/lib*/Makefile
+
+	LP49-yymmdd/src/cmd/*/Makefile
+
+
+* Makefiles are not complete. Especially: 
+  Unfortunately, header files (*.h) are not considered.
+
+* When header files are modified, you shoud try make clear; make
+
+
+
+<<< Total make >>>
+
+[1] Walk to the LP49-yymmdd/src/ directory
+
+	% cd  LP49-yymmdd/src/ 
+
+[2] Clean up works
+
+	% make clean
+
+[3] Then  make
+	%  make
+
+	Many warnings... 
+
+[4] Then copy binaries onto LP49-yymmdd/rootfs/{boot, bin}/ directory.
+
+        % make install
+    	 
+	 -- Built binaries are copied into 
+	     LP49-yymmdd/rootfs/boot/*   and
+	     LP49-yymmdd/rootfs/bin/*
+
+[5]  cmd.zip
+        
+	% cd LP49-yymmdd/rootfs/bin/
+	% make
+
+	--- cmd.zip file is built.
+
+
+
+<<< Boot floppy image: lp49-boot.fd and lp49-boot-x2.fd >>>
+
+  lp49-boot.fd : 1.44 MB floppy image
+
+  lp49-boot-x2.fd :  2.88 MB floppy image
+
+
+
+[1] Contents
+
+lp49-boot.fd:
+
+        kickstart-0804.gz    --- L4 kernel startup  
+        l4ka-0804.gz         --- L4 micro kernel
+        sigma0-0804.gz       --- L4 root pager
+  
+        a/
+                dossrv.gz    --- DOS file server
+                hvm.gz       --- (not) Hypervisory module
+                pc.gz        --- LP49 core process
+                qsh.gz       --- LP49 quasi (debugging) shell
+  
+        b/
+                cmd.zip    ---- ZIP file of LP49 commands.
+  
+        boot/
+                grub/
+                        menu.lst  --- Grub menu
+                        stage1    --- Grub stage-1
+                        stage2    --- Grub stage-2
+
+
+[2] When LP49 startup, boot floppy image is mounted at the /t directory.
+
+	LP49[/]: ls /t
+
+
+*=============================================*
+|     How to make  bootable CD                |
+|                                             |
+*=============================================*
+
+<<< How to make bootable CD-ROM >>
+
+(1)  Download the file "lp49-cd.tar" from http://research.nii.ac.jp/H2O/LP49 
+     onto ~/LP49 directory.
+
+(2)  # cd ~/LP49
+
+(3) # ls lp49-cd.tar
+
+(4) # tar xvf lp49-cd.tar
+
+(5) lp49-cd  will include:
+   <<< Directory structure >>>
+        a/
+		hvm.gz
+		pc.gz
+		qsh.gz
+		dossrv.gz
+        b/
+	        ... comands ...
+	
+	boot/
+		grub/
+			menu.lst
+			stage2_eltorito
+        boot.catalog
+	kickstart-yymm.gz
+	l4ka-yymm.gz
+	pingpong.gz
+	sigma0-yymm.gz
+	
+(6) copy files onto a/ directory (LP49 core) or b/directories (commands).    
+
+
+(7) Make ISO image 
+    
+    # mkisofs -R -b boot/grub/stage2_eltorito -no-emul-boot \
+         -boot-load-size 4  -boot-info-table  -o lp49-boot.iso  lp49-cd
+
+
+(8) cdrecored  command or cdwrite command
+
+
+
+
+<<< How to  use  CD-ROM on Qemu>>
+
+(1)  # cd LP49
+
+(2)  qemu -fda lp49-boot-x2.fd -cdrom lp49-boot.iso -std-vga -net nic,,,
+
+(3) LP49 starts
+
+(4) LP49[/]: bind -a #S /dev
+    LP49[/]: ls     /dev/sdD0/data
+
+(5) LP49[/]: spawn /t/b/9660srv -v &
+
+    --> /srv/9660 will be created.
+
+(6) LP49[/]: mount -a /srv/9660 /work   /dev/sdD0/data
+
+(7) LP49[/]: cd /work
+
+(7) LP49[/work]: ls 
+

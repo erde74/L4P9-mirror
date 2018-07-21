@@ -1,0 +1,4 @@
+# read file
+open:in,OREAD
+readv:20,20
+close

@@ -1,0 +1,252 @@
+**********************************************************
+*     VGA is not yet supported                           *
+*     This document explains Plan9 VGA handling.         *
+**********************************************************
+
++-----------------------------------------------+
+|     devdraw.c                                 |
++-----------------------------------------------+
+<<< WHAT >>>
+
+  Draw graphics on screen.
+
+
+<<< DIRECTORIES >>>
+
+/dev/draw/new
+/dev/draw/<n>/ctl
+              data
+              colormap
+              reflesh
+
+<<< Commands which /dev/draw/<n>/data file accepts >>>
+
+
+
+
++-----------------------------------------------+
+|     devvga.c                                  |
++-----------------------------------------------+
+<<< SYNOPSIS >>>
+	bind #v /dev
+
+	/dev/vgactl
+	     vgaovlctl
+             vgaovl
+             vgabios
+
+
+<<< vgareset() >>>
+
+* 
+    vgareset( )
+      :
+      ioalloc(0x2B0, 0x2BF--0x2B0+1, 0, "vga) 
+      ioalloc(0x3C0, 0x3DA--0x3C0+1, 0, "vga) 
+      :
+
+
+<<< Configuring VGA device >>>
+* By writing strings to vgactl file.
+
+
+
+
++-----------------------------------------------+
+|     struct VGAdev, VGAcur, VGAscr             |
++-----------------------------------------------+
+<<< FILE >>>
+	src/pc/screen.h
+
+struct VGAdev {
+        char*   name;
+        void    (*enable)(VGAscr*);
+        void    (*disable)(VGAscr*);
+        void    (*page)(VGAscr*, int);
+        void    (*linear)(VGAscr*, int, int);
+        void    (*drawinit)(VGAscr*);
+        int     (*fill)(VGAscr*, Rectangle, ulong);
+        void    (*ovlctl)(VGAscr*, Chan*, void*, int);
+        int     (*ovlwrite)(VGAscr*, void*, int, vlong);
+        void (*flush)(VGAscr*, Rectangle);
+};
+ 
+struct VGAcur {
+        char*   name;
+        void    (*enable)(VGAscr*);
+        void    (*disable)(VGAscr*);
+        void    (*load)(VGAscr*, Cursor*);
+        int     (*move)(VGAscr*, Point);
+        int     doespanning;
+};
+ 
+struct VGAscr {
+        Lock    devlock;
+        VGAdev* dev;
+        Pcidev* pci;
+        VGAcur* cur;
+        ulong   storage;
+        Cursor;
+        int     useflush;
+        ulong   paddr;          /* frame buffer */
+        void*   vaddr;
+        int             apsize;
+        ulong   io;                             /* device specific registers */
+        ulong   *mmio;
+        ulong   colormap[Pcolours][3];
+        int     palettedepth;
+        Memimage* gscreen;
+        Memdata* gscreendata;
+        Memsubfont* memdefont;
+        int     (*fill)(VGAscr*, Rectangle, ulong);
+        int     (*scroll)(VGAscr*, Rectangle, Rectangle);
+        void    (*blank)(VGAscr*, int);
+        ulong   id;     /* internal identifier for driver use */
+        int isblank;
+        int overlayinit;
+};
+
+
+
+
++-----------------------------------------------+
+|     vgavmware.c                               |
++-----------------------------------------------+
+
+* PCIVMWARE
+
+
+
+<<< vmwarelinear() >>>
+
+     vmwarelinear( )
+       :
+       p = pcimatch(0, PCIVMWARE, 0)
+       :
+       vgalinearaddr(...)
+       :
+       addvgaseg(..)
+
+
+<<< vmwaredrawinit() >>>
+
+     vmwaredrawinit(..)
+       	:
+        mmiobase = vmrd(...)
+        :
+        scr->mmio = vmap(mmiobase, mmiosize)  // VMAP
+        :
+        addvgaseg(...)
+
+	   
+
++-----------------------------------------------+
+|       vgavesa.c                               |
++-----------------------------------------------+
+<<< vgavesa.c >>>
+
+static uchar* vbesetup(Ureg *u, int ax)
+{
+        ulong pa;
+        pa = PADDR(RMBUF);
+        memset(u, 0, sizeof *u);
+        u->ax = ax;
+        u->es = (pa>>4)&0xF000;
+        u->di = pa&0xFFFF;
+        return (void*)RMBUF;
+}
+                                                                                           
+static void vbecall(Ureg *u)
+{
+        u->trap = 0x10;
+        realmode(u);  //<====== REALNODE !!!
+        if((u->ax&0xFFFF) != 0x004F)
+                error("vesa bios error");
+}
+                                                                                           
+static void vbecheck(void)
+{
+        Ureg u;
+        uchar *p;
+        p = vbesetup(&u, 0x4F00);
+        strcpy((char*)p, "VBE2");
+        vbecall(&u);
+        if(memcmp((char*)p, "VESA", 4) != 0)
+                error("bad vesa signature");
+        if(p[5] < 2) error("bad vesa version");
+}
+                                                                                           
+static int vbegetmode(void)
+{
+        Ureg u;
+        vbesetup(&u, 0x4F03);
+        vbecall(&u);
+        return u.bx;
+}
+                                                                                           
+static uchar* vbemodeinfo(int mode)
+{
+        uchar *p;
+        Ureg u;
+        p = vbesetup(&u, 0x4F01);
+        u.cx = mode;
+        vbecall(&u);
+        return p;
+}
+                                                                                           
+static void vesalinear(VGAscr* scr, int _x, int _y) //%
+{
+        int i, mode, size;
+        uchar *p;
+        ulong paddr;
+        Pcidev *pci;
+                                                                                           
+        vbecheck();
+        mode = vbegetmode();
+        mode &= 0x3FFF;
+        p = vbemodeinfo(mode);
+        if(!(WORD(p+0) & (1<<4)))error("not in VESA graphics mode");
+        if(!(WORD(p+0) & (1<<7)))error("not in linear graphics mode");
+                                                                                           
+        paddr = LONG(p+40);
+        size = WORD(p+20)*WORD(p+16);
+        size = PGROUND(size);
+                                                                                           
+        pci = nil;
+        while((pci = pcimatch(pci, 0, 0)) != nil){
+                if(pci->ccrb != 3)  continue;
+                for(i=0; i<nelem(pci->mem); i++)
+                        if(paddr == (pci->mem[i].bar&~0x0F)){
+                                if(pci->mem[i].size > size)
+                                        size = pci->mem[i].size;
+                                goto havesize;
+                        }
+        }
+                                                                                           
+        if(size < 4*1024*1024) size = 4*1024*1024;
+        else      size = ROUND(size, 1024*1024);
+                                                                                           
+havesize:
+        vgalinearaddr(scr, paddr, size);
+}
+                                                                                           
+VGAdev vgavesadev = {
+        "vesa",
+        0,
+        0,
+        0,
+        vesalinear,
+        0,
+        0,
+        0,
+        0,
+        0,
+};
+
+
+<<< realmode.c >>>
+
+
+<<< l.s >>>
+
+

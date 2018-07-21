@@ -1,0 +1,39 @@
+<<< Compiler problem >>>
+
+
+    *  Current LP49 does work with GCC-v3.2, 
+       but does NOT work with GCC-v4.x !!!
+
+
+<<< GCC v3.2 >>>
+
+    * make  (LP49-yymmdd/src/Makefile)  -- OK
+    * execution				-- OK
+
+<<< GCC v4.1 >>>
+
+    * make  (LP49-yymmdd/src/Makefile)  -- OK
+    * execution				-- NG
+
+    * IRQ Interruptions are not catched.
+         /libl4com/l4-p9-irq.c:p9_irq_thread_body(  )
+ 
+
+
+
+<<< GCC version PROBLEM >>>
+
+    * Recent Linux OS's include GCC-4.x, but not GCC-3.2.
+
+    * LP49 needs GCC-3.2. 
+        GCC-4.x has some inconvenience with LP49.
+
+    * GCC-3.2-source-tar-ball can be downloaded from GCC archives.
+
+    * However, GCC-3.2 cannot be compiled by GCC-4.x. 
+      What a pity !
+
+
+
+
+

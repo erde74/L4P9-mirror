@@ -1,0 +1,269 @@
+<><><> malloc() <><><> 
+
+  xalloc-l4.c 
+
+
+
+<><><> PIPE _write( ) <><><>
+
+==== sysfile-l4.c =====================
+
+sys_write(ulong *arg)
+{
+        DBGPRN("> %s(%d %x %d) \n", __FUNCTION__, arg[0], arg[1], arg[2]);
+        return write(arg, nil);
+}
+
+-------------------------------------
+static long
+write(ulong *arg, vlong *offp)
+{
+        Chan *c;
+        long m, n;
+        vlong off;
+        DBGPRN("> %s(%d %X %d %d)\n", __FUNCTION__, arg[0], arg[1], arg[2], (uint)offp);
+
+        validaddr(arg[1], arg[2], 0);
+        n = 0;
+        c = fdtochan(arg[0], OWRITE, 1, 1);   // pr_chan(c); //%
+        if(waserror()) {   
+                if(offp == nil){
+                  lock(& c->_ref._lock);  //% (c)
+                        c->offset -= n;
+                        unlock(& c->_ref._lock);  //%  (c);
+                }
+                cclose(c);
+                nexterror();
+        }
+
+        if(c->qid.type & QTDIR)
+                error(Eisdir);
+
+        n = arg[2];
+
+        if(offp == nil){        /* use and maintain channel's offset */
+                lock(& c->_ref._lock);  //%  (c)
+                off = c->offset;
+                c->offset += n;
+                unlock(& c->_ref._lock);  //%  (c)
+        }else
+                off = *offp;
+
+        if(off < 0)
+                error(Enegoff);
+        // pr_chan(c);  //%
+
+#if 1 //%-----------------------
+        if (n <= _BUFSIZE) {
+          //DPR("XX %x %x %x %n \n", TID2PROCNR(client), (ulong)arg[1], (ulong)_buf, n);
+                proc2proc_copy(TID2PROCNR(client), (ulong)arg[1],
+                               1, (ulong)_buf, n);
+                DPR("%s\n", _buf);  pr_chan(c);  //%
+                m = devtab[c->type]->write(c, (void*)_buf, n, off);
+
+                _buf[0] = 0;
+                DBGPRN("# write \"%s\" \n",  devtab[c->type]->name);
+        }
+        else {
+          DBGBRK("sysfile:write %d > _BUFSIZE \n", n);
+        }
+#else //original
+        m = devtab[c->type]->write(c, (void*)arg[1], n, off);
+#endif //%--------------------
+
+        if(offp == nil && m < n){
+          lock(& c->_ref._lock);  //% (c);
+                c->offset -= n - m;
+                unlock(& c->_ref._lock);  //% (c)
+        }
+
+        poperror();
+        cclose(c);
+
+        DBGPRN("< %s(%x %x %x %x)->%d \n",
+               __FUNCTION__, arg[0], arg[1], arg[2], (ulong)offp, m);
+        return m;
+}
+
+<><><>  pipe <><><>
+
+===== devpipe.c ==================
+pipewrite(Chan *c, void *va, long n, vlong _x)
+{
+        Pipe *p;
+        DBGPRN("> %s(%x %x %d)\n", __FUNCTION__, c, va);
+        //% if(!islo())
+        //%     print("pipewrite hi %lux\n", getcallerpc(&c));
+
+        if(waserror()) {
+                /* avoid notes when pipe is a mounted queue */
+                if((c->flag & CMSG) == 0)
+                        postnote(up, 1, "sys: write on closed pipe", NUser);
+                nexterror();
+        }
+
+        p = c->_u.aux;    //% _u.
+
+        switch(NETTYPE(c->qid.path)){
+        case Qdata0:
+                n = qwrite(p->q[1], va, n);
+                break;
+
+        case Qdata1:
+                n = qwrite(p->q[0], va, n);
+                break;
+
+        default:
+                panic("pipewrite");
+        }
+
+        poperror();  DPR("<<<");
+        return n;
+}
+
+
+============ qio.c ================
+qwrite(Queue *q, void *vp, int len)
+{
+        int n, sofar;
+        Block *b;
+        uchar *p = vp;
+
+        DBGPRN("> %s(%x %x %d)\n", __FUNCTION__, q, vp, len);
+        QDEBUG if(!islo())
+                print("qwrite hi %lux\n", getcallerpc(&q));
+
+        sofar = 0;
+        do {
+                n = len-sofar;
+                if(n > Maxatomic)
+                        n = Maxatomic;
+
+                b = allocb(n);
+                setmalloctag(b, (up->text[0]<<24)|(up->text[1]<<16)|(up->text[2]<<8)|up->text[3]);
+                DPR("# qio.c # %X #1#\n", b); //%%%
+#if 0   //%?????????????
+                if(waserror()){
+                        freeb(b);  DPR("# qio.c # %X #2#\n", b); //%%%
+                        nexterror();
+                }
+#endif
+                DPR("# qio.c # %X #3#\n", b); //%%%
+
+                memmove(b->wp, p+sofar, n);
+                poperror();
+                b->wp += n;
+
+                qbwrite(q, b);
+
+                sofar += n;
+        } while(sofar < len && (q->state & Qmsg) == 0);
+
+        return len;
+}
+
+----------------------------------------------------
+long
+qbwrite(Queue *q, Block *b)
+{
+        int n, dowakeup;
+        Proc *p;
+
+        DBGPRN("> %s(%x %x)\n", __FUNCTION__, q, b);
+        n = BLEN(b);
+
+        if(q->bypass){
+                (*q->bypass)(q->arg, b);
+                return n;
+        }
+
+        dowakeup = 0;
+        qlock(&q->wlock);
+        if(waserror()){
+                if(b != nil)
+                        freeb(b);
+                qunlock(&q->wlock);
+                nexterror();
+        }
+
+        ilock(&q->_lock);  //% ilock(q);
+
+        /* give up if the queue is closed */
+        if(q->state & Qclosed){
+                iunlock(&q->_lock);   //% iunlock(q);
+                error(q->err);
+        }
+
+        /* if nonblocking, don't queue over the limit */
+        if(q->len >= q->limit){
+                if(q->noblock){
+                        iunlock(&q->_lock);   //% iunlock(q);
+                        freeb(b);
+                        noblockcnt += n;
+                        qunlock(&q->wlock);
+                        poperror();
+                        return n;
+                }
+        }
+
+        /* queue the block */
+        if(q->bfirst)
+                q->blast->next = b;
+        else
+        else
+                q->bfirst = b;
+        q->blast = b;
+        b->next = 0;
+        q->len += BALLOC(b);
+        q->dlen += n;
+        QDEBUG checkb(b, "qbwrite");
+        b = nil;
+
+        /* make sure other end gets awakened */
+        if(q->state & Qstarve){
+                q->state &= ~Qstarve;
+                dowakeup = 1;
+        }
+        iunlock(&q->_lock);   //% iunlock(q);
+
+        /*  get output going again */
+        if(q->kick && (dowakeup || (q->state&Qkick)))
+                q->kick(q->arg);
+
+        /* wakeup anyone consuming at the other end */
+        if(dowakeup){
+                p = wakeup(&q->rr);
+
+                /* if we just wokeup a higher priority process, let it run */
+                if(p != nil && p->priority > up->priority)
+                        sched();
+        }
+
+        /*
+         *  flow control, wait for queue to get below the limit
+         *  before allowing the process to continue and queue
+         *  more.  We do this here so that postnote can only
+         *  interrupt us after the data has been queued.  This
+         *  means that things like 9p flushes and ssl messages
+         *  will not be disrupted by software interrupts.
+         *
+         *  Note - this is moderately dangerous since a process
+         *  that keeps getting interrupted and rewriting will
+         *  queue infinite crud.
+         */
+        for(;;){
+                if(q->noblock || qnotfull(q))
+                        break;
+
+                ilock(&q->_lock);  //% ilock(q);
+                q->state |= Qflow;
+                iunlock(&q->_lock);   //% iunlock(q);
+                sleep(&q->wr, qnotfull, q);
+        }
+        //%  USED(b);
+
+        qunlock(&q->wlock);
+        poperror();
+        return n;
+}
+

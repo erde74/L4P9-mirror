@@ -1,0 +1,269 @@
+char* getwd(char *buf, int nbuf)
+{
+    int n, fd;
+    fd = open(".", OREAD);
+    if(fd < 0) { perror("getwd");
+        return nil;
+    }
+ 
+    //  L4_Yield();
+    L4_Sleep(L4_TimePeriod (100000UL /*microsec*/)); //100ms
+ 
+    n = fd2path(fd, buf, nbuf);
+    close(fd);
+    if(n < 0) {  perror("fd2path");
+        return nil;
+    }
+    return buf;
+}
+
+
+//------------ sysfile-l4.c ---------------------
+
+long sysopen(ulong *arg, Clerkjob_t *myjob)  //%  ONERR
+{
+        int fd;
+        Chan *c = 0;
+        int  rc; //%
+        DBGPRN("> %s(\"%s\", %x) \n", __FUNCTION__, arg[0], arg[1]);
+ 
+        //      dbg_time(1, 0); //%
+#if 1 //%----------------------------
+        rc = openmode(arg[1]);  /* error check only */
+        IF_ERR_RETURN(rc, ONERR, ONERR); //%
+#else //original
+        openmode(arg[1]);       /* error check only */
+#endif //%----------------------------
+ 
+        if(WASERROR()){
+        _ERR_1:
+                if(c)
+                        cclose(c);
+                NEXTERROR_RETURN(ONERR);  //%
+        }
+        //%  validaddr(arg[0], 1, 0);
+        c = namec((char*)arg[0], Aopen, arg[1], 0);
+        IF_ERR_GOTO(c, nil, _ERR_1);  //%
+ 
+        fd = newfd(c);
+        if(fd < 0)
+                ERROR_GOTO(Enofd, _ERR_1);  //%
+ 
+        POPERROR();
+        DBGPRN("< %s(\"%s\", %x)->%d \n", __FUNCTION__, arg[0], arg[1], fd);
+        //      dbg_time(1, "sysfile:open"); //%
+        return fd;
+}
+ 
+
+//============ chan.c ==========================
+/*
+ * Either walks all the way or not at all.  No partial results in *cp.
+ * *nerror is the number of names to display in an error message.
+ */
+static char Edoesnotexist[] = "does not exist";
+
+int walk(Chan **cp, char **names, int nnames, int nomount, int *nerror)
+{
+        int dev, dotdot, i, n, nhave, ntry, type;
+        Chan *c, *nc, *mtpt;
+        Path *path;
+        Mhead *mh, *nmh;
+        Mount *f;
+        Walkqid *wq;
+
+	int ZZZ = 0;
+if (strcmp((*cp)->path->s, "/t/b")==0) ZZZ = 1;
+
+PRN(">walk('%s' names:%s nomnt:%d) \n",
+               (*cp)->path->s, _dbg_names(names, nnames), nomount);
+
+        c = *cp;
+        incref( &c->_ref );  //%
+        path = c->path;
+        incref( &path->_ref ); //%
+        mh = nil;
+
+        /*
+         * While we haven't gotten all the way down the path:
+         *    1. step through a mount point, if any
+         *    2. send a walk request for initial dotdot or initial prefix without dotdot
+         *    3. move to the first mountpoint along the way.
+         *    4. repeat.
+         *
+         * An invariant is that each time through the loop, c is on the undomount
+         * side of the mount point, and c's full path is path.
+         */
+
+        for(nhave=0; nhave<nnames; nhave+=n){
+                if((c->qid.type&QTDIR)==0){
+                        if(nerror)
+                                *nerror = nhave;
+                        pathclose(path);
+                        cclose(c);
+                        strcpy(up->errstr, Enotdir);
+                        if(mh != nil)
+                                putmhead(mh);
+                        DBGPRN("< %s {%s}=> -1 No-directory\n", __FUNCTION__, &names[nhave]);
+                        return -1;
+                }
+
+                ntry = nnames - nhave;
+                if(ntry > MAXWELEM)
+                        ntry = MAXWELEM;
+                dotdot = 0;
+
+                for(i=0; i<ntry; i++){
+                        if(isdotdot(names[nhave+i])){
+                                if(i==0){
+                                        dotdot = 1;
+                                        ntry = 1;
+                                }else
+                                        ntry = i;
+                                break;
+                        }
+                }
+
+                if(!dotdot && !nomount) {
+                        domount(&c, &mh, &path);
+                }
+
+                type = c->type;
+                dev = c->dev;
+
+                if((wq = ewalk(c, nil, names+nhave, ntry)) == nil){
+                        /* try a union mount, if any */
+                        if(mh && !nomount){
+                                /*
+                                 * mh->mount->to == c, so start at mh->mount->next
+                                 */
+                                rlock(&mh->lock);
+
+                                for(f = mh->mount->next; f; f = f->next){
+                                        if((wq = ewalk(f->to, nil, names+nhave, ntry)) != nil)   
+                                            break;
+                                }
+
+
+                                runlock(&mh->lock);
+                                if(f != nil){
+                                        type = f->to->type;
+                                        dev = f->to->dev;
+                                }
+                        }
+
+                        if(wq == nil){
+                                cclose(c);
+                                pathclose(path);
+                                if(nerror)
+                                        *nerror = nhave+1;
+                                if(mh != nil)
+                                        putmhead(mh);
+
+                                return -1;
+                        }
+                }
+
+                nmh = nil;
+                if(dotdot){
+                        assert(wq->nqid == 1);
+                        assert(wq->clone != nil);
+
+                        path = addelem(path, "..", nil);
+                        nc = undomount(wq->clone, path);
+                        n = 1;
+                }
+                else{
+                        nc = nil;
+                        nmh = nil;
+
+                        if(!nomount){
+                                for(i=0; i<wq->nqid && i<ntry-1; i++){
+                                        if(findmount(&nc, &nmh, type, dev, wq->qid[i]))
+                                                break;
+                                }
+                        }
+                        // pr_chan(nc); //%%%%
+
+                        if(nc == nil){  /* no mount points along path */
+                                if(wq->clone == nil){
+                                        cclose(c);
+                                        pathclose(path);
+
+                                        if(wq->nqid==0 || (wq->qid[wq->nqid-1].type&QTDIR)){
+                                                if(nerror)
+                                                        *nerror = nhave+wq->nqid+1;
+
+                                                strcpy(up->errstr, Edoesnotexist);
+                                        }
+                                        else{
+                                                if(nerror)
+                                                        *nerror = nhave+wq->nqid;
+                                                strcpy(up->errstr, Enotdir);
+                                        }
+
+                                        free(wq);
+                                        if(mh != nil)
+                                                putmhead(mh);
+
+                                        DBGPRN("< %s {%s}=>-1 \n", __FUNCTION__, names[nhave]);
+                                        return -1;
+                                }
+
+                                n = wq->nqid;
+                                nc = wq->clone;
+                        }
+                        else{
+                                /* stopped early, at a mount point */
+                                if(wq->clone != nil){
+                                        cclose(wq->clone);
+                                        wq->clone = nil;
+                                }
+                                n = i+1;
+                        }
+
+                        for(i=0; i<n; i++){
+                                mtpt = nil;
+
+                                if(i==n-1 && nmh)
+                                        mtpt = nmh->from;
+
+                                path = addelem(path, names[nhave+i], mtpt);
+                        }
+                }
+                cclose(c);
+                c = nc;
+                putmhead(mh);
+                mh = nmh;
+                free(wq);
+        }
+
+        putmhead(mh);
+
+        PRN("walk6(%s,ref:%d) ", c->path->s, c->_ref.ref);
+
+        c = cunique(c);
+
+PRN("walk7(%s) ", c->path->s);
+
+        if(c->umh != nil){      //BUG
+                print("walk umh\n");
+                putmhead(c->umh);
+                c->umh = nil;
+        }
+
+PRN("walk8(%s) ", c->path->s);
+
+        pathclose(c->path);
+        c->path = path;
+
+        cclose(*cp);
+        *cp = c;
+        if(nerror)
+                *nerror = nhave;
+
+PRN("<walk()=>'%s' \n", c->path->s);
+        return 0;
+}
+
+

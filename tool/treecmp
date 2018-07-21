@@ -1,0 +1,45 @@
+#! /bin/bash
+#
+# recursive cmp this directory and the the mate directory
+# 
+# Only files ended with {.c  .h  .S .s  akefile}  are compared.
+# 
+# usage:
+# % treecmp  matedir
+# recursivery cmp the <current directory> and the <mate directory>
+#
+
+matedir=$1
+
+echo  ===== treecmp ======   
+echo  This directory: ${pwd}  
+echo  Mate directory: ${matedir} 
+echo
+
+for file in $(ls -R )  
+do 
+#    echo ${file}
+
+    if  [ ${file} !=  ${file%%:} ]  ## ${file} matches "xxxx:"
+    then 
+        dir=${file%%:}  ## This is a directory name.
+#        echo  :::: ${dir}
+
+    else
+       if [ ${file} = ${file%%/} ]  ## ${file} unmatches "xxxx/"
+       then 
+#         if [ ${file} =  ${file%%.o} ] && ! [ -x ${file} ]
+          if [ ${file} != ${file%%.c} ] || [ ${file} != ${file%%.h} ] || \
+             [ ${file} != ${file%%.S} ] || [ ${file} != ${file%%.s} ] || \
+             [ ${file} != ${file%%.cc} ] ||  \
+             [ ${file} != ${file%%akefile} ]
+              #----------   ${file} mathces either "xxxx.c", "xxxx.h" or "xxxx.S"
+	   then 
+#	       echo ${dir}/${file} "<-->"  echo ${matedir}/${dir}/${file}
+               cmp ${dir}/${file} ${matedir}/${dir}/${file}
+           fi
+       fi
+    fi
+done
+
+

@@ -1,0 +1,193 @@
+//====================================================================
+
+fsys.c:213:	send(fs->cxfidalloc, nil); //%
+xfid.c:81:	sendp(cxfidalloc, x); //%
+xfid.c:52:	alts[Alloc].c = cxfidalloc;    .v = nil;    	.op = CHANRCV;
+fsys.c:214:	recv(fs->cxfidalloc, &x); //%
+
+xfid.c:122:	sendp(cxfidfree, x); //%
+xfid.c:148:	sendp(cxfidfree, xf); //%
+xfid.c:55:	alts[Free].c = cxfidfree;      .v = &x;     	.op = CHANRCV;
+
+
+fsys.c:323:	sendp(x->c, xfidflush);
+fsys.c:342:	sendp(x->c, xfidattach); //%
+fsys.c:505:	sendp(x->c, xfidopen);
+fsys.c:540:	sendp(x->c, xfidread);
+fsys.c:599:     sendp(x->c, xfidwrite); //%
+fsys.c:612:	sendp(x->c, xfidclose); //%
+time.c:74:	if(nbsendul(x->c, 0) > 0)
+
+fsys.c:436:	sendp(winclosechan, f->w);
+fsys.c:465:	sendp(winclosechan, nf->w); //%
+fsys.c:616:	sendp(winclosechan, f->w); //%
+rio.c:458:	w = recvp(winclosechan);  //%
+
+rio.c:496:	sendp(deletechan, s); //%
+rio.c:475:	s = recvp(deletechan);  //%
+
+rio.c:741:	send(exitchan, nil);
+rio.c:265:	recv(exitchan, nil); //%
+
+rio.c:394:	sendp(input->ck, rp);  //%
+wind.c:287:	alts[WKey].c = w->ck; .v = &kbdr; .op = CHANRCV;
+
+rio.c:413:	send(keyboardctl->c, &r[i]);  //%
+rio.c:385:	recv(keyboardctl->c, rp);  //%
+rio.c:387:	if(nbrecv(keyboardctl->c, rp+i) <= 0)  //%
+
+rio.c:512:      send(wkeyboard->mc.c, mouse);  //%
+rio.c:519:	send(wkeyboard->mc.c, mouse);  //%
+rio.c:602:	send(winput->mc.c, &tmp);
+scrl.c:179:	nbrecv(w->mc.c, &w->mc._mouse);  //% Mouse
+scrl.c:110:	alts[1].c = w->mc.c; 	    .v = &w->mc._mouse;	.op = CHANRCV;
+wind.c:290:	alts[WMouse].c = w->mc.c;   .v = &w->mc._mouse; .op = CHANRCV;
+
+
+rio.c:623:	wsendctlmesg(winput, Reshaped, i->r, i);
+rio.c:625:	wsendctlmesg(winput, Moved, r, i);
+rio.c:705:	wsendctlmesg(w, Reshaped, r, im);
+rio.c:807:	wsendctlmesg(w, Wakeup, ZR, nil);
+rio.c:1104:	wsendctlmesg(w, Deleted, ZR, nil);
+rio.c:1118:	wsendctlmesg(w, Reshaped, i->r, i);
+rio.c:1133:	wsendctlmesg(w, Moved, r, i);
+rio.c:1149:	wsendctlmesg(w, Reshaped, ZR, i);
+rio.c:1166:	wsendctlmesg(w, Reshaped, w->i->r, i);
+rio.c:1258:	wsendctlmesg(w, Deleted, ZR, nil);
+wctl.c:415:	wsendctlmesg(w, Reshaped, i->r, i);
+wctl.c:420:	wsendctlmesg(w, Wakeup, ZR, nil);
+wctl.c:424:	wsendctlmesg(w, Wakeup, ZR, nil);
+wctl.c:461:	wsendctlmesg(w, Deleted, ZR, nil);
+wind.c:238:	wsendctlmesg(w, Exited, ZR, nil);
+xfid.c:293:	wsendctlmesg(w, Wakeup, ZR, nil);
+xfid.c:316:	wsendctlmesg(w, Rawoff, ZR, nil);
+xfid.c:320:	wsendctlmesg(w, Holdoff, ZR, nil);
+xfid.c:332:	wsendctlmesg(w, Refresh, w->i->r, nil);
+xfid.c:442:	wsendctlmesg(w, Holdon, ZR, nil);
+xfid.c:447:	wsendctlmesg(w, Holdoff, ZR, nil);
+xfid.c:453:	wsendctlmesg(w, Holdoff, ZR, nil);
+xfid.c:456:	wsendctlmesg(w, Rawon, ZR, nil);
+xfid.c:461:	wsendctlmesg(w, Rawoff, ZR, nil);
+xfid.c:505:	wsendctlmesg(w, Movemouse, Rpt(pt, pt), nil);
+wind.c:1334:	wsendctlmesg(oi, Wakeup, ZR, nil);
+wind.c:1338:	wsendctlmesg(w, Wakeup, ZR, nil);
+wind.c:1178:	send(w->cctl, &wcm);
+wind.c:296:	alts[WCtl].c = w->cctl; .v = &wcm; .op = CHANRCV;
+
+
+time.c:127:	sendp(ctimer, t);
+time.c:84:	x = recvp(ctimer);
+time.c:95:	if(nbrecv(ctimer, &x) > 0)
+
+wctl.c:517:	sendp(c, buf);
+
+
+wind.c:415:	send(mrm.cm, &m._mouse);  //% Mouse;  mousethread <-- mrm.cm ! (m._mouse)
+xfid.c:703:	recv(mrm.cm, nil);	/* wake up window and toss data */
+xfid.c:708:	recv(mrm.cm, &ms); //%
+wind.c:293:	alts[WMouseread].c = w->mouseread; .v = &mrm;  .op = CHANSND;
+xfid.c:683:	alts[MRdata].c = w->mouseread;     .v = &mrm;	.op = CHANRCV;
+
+
+wind.c:486:	recv(crm.c1, &pair); //% ***  -->  crm.c1 ? (pair)
+wind.c:517:	send(crm.c2, &pair);  //% ***  <--  crm.c1 ! (pair)
+wind.c:302:	alts[WCread].c = w->consread;  .v = &crm;  	.op = CHANSND;
+xfid.c:624:	alts[CRdata].c = w->consread;  .v = &crm;  	.op = CHANRCV;
+
+wind.c:543:	send(cwrm.c2, &pair);  //% *** <-- cwrm.c2 ! (pair)
+wind.c:527:	recv(cwrm.c1, &pair); //% *** --> cwrm.c1 ! (pair)
+wind.c:305:	alts[WWread].c = w->wctlread;  .v = &cwrm;  	.op = CHANSND;
+xfid.c:825:	alts[WCRdata].c = w->wctlread; .v = &cwrm;  	.op = CHANRCV;
+
+
+wind.c:1488:	sendul(pidc, 0);
+wind.c:1494:	sendul(pidc, 0);
+wind.c:1500:	sendul(pidc, 0);
+
+
+xfid.c:546:	keyboardsend(x->_fcall.data, cnt); //%
+xfid.c:647:	send(c1, &pair);
+xfid.c:848:	send(c1, &pair);  //%
+
+
+rio.c:1252:	pid = recvul(cpid); //%
+
+
+wctl.c:482:	buf = recvp(c);
+
+xfid.c:426:	send(cwm.cw, &pair);	/* wake up window with empty data */
+xfid.c:433:	send(cwm.cw, &pair);
+wind.c:438:	recv(cwm.cw, &pair);
+wind.c:299:	alts[WCwrite].c = w->conswrite; .v = &cwm; 	.op = CHANSND;
+xfid.c:404:	alts[CWdata].c = w->conswrite;	.v = &cwm;  	.op = CHANRCV;
+
+
+xfid.c:119:	f = recvp(x->c);  //%
+
+xfid.c:141:	sendul(xf->flushc, 0); //%
+xfid.c:423:	recv(x->flushc, nil);	/* wake up flushing xfid */
+xfid.c:649:	recv(x->flushc, nil);	/* wake up flushing xfid */
+xfid.c:702:	recv(x->flushc, nil);	/* wake up flushing xfid */
+xfid.c:850:	recv(x->flushc, nil);	/* wake up flushing xfid */
+xfid.c:407:	alts[CWflush].c = x->flushc;  	.v = nil;	.op = CHANRCV;
+xfid.c:627:	alts[CRflush].c = x->flushc;  	.v = nil;     	.op = CHANRCV;
+xfid.c:686:	alts[MRflush].c = x->flushc;	.v = nil;	.op = CHANRCV;
+xfid.c:828:	alts[WCRflush].c = x->flushc;   .v = nil;	.op = CHANRCV;
+
+
+xfid.c:650:	recv(c2, nil);		/* wake up window and toss data */
+xfid.c:656:	recv(c2, &pair); //%
+
+xfid.c:851:	recv(c2, nil);		/* wake up window and toss data */
+xfid.c:857:	recv(c2, &pair);  //%
+
+
+rio.c:544:	alts[MReshape].c = mousectl->resizec;  	.v = nil; .op = CHANRCV;
+rio.c:547:	alts[MMouse].c = mousectl->c;   .v = &mousectl->_mouse; .op = CHANRCV;
+
+scrl.c:107:	alts[0].c = timer->c; .v = nil; .op = CHANRCV;
+
+
+//================================================================================
+dat.h:93:	Channel	*cw;	/* chan(Stringpair) */
+dat.h:98:	Channel	*c1;	/* chan(tuple(char*, int) == Stringpair) */
+dat.h:99:	Channel	*c2;	/* chan(tuple(char*, int) == Stringpair) */
+dat.h:104:	Channel	*cm;	/* chan(Mouse) */
+dat.h:147:	Channel	*ck;		/* chan(Rune[10]) */
+dat.h:148:	Channel	*cctl;		/* chan(Wctlmesg)[20] */
+dat.h:149:	Channel	*conswrite;	/* chan(Conswritemesg) */
+dat.h:150:	Channel	*consread;	/* chan(Consreadmesg) */
+dat.h:151:	Channel	*mouseread;	/* chan(Mousereadmesg) */
+dat.h:152:	Channel	*wctlread;	/* chan(Consreadmesg) */
+dat.h:195:Window*	wmk(Image*, Mousectl*, Channel*, Channel*, int);
+dat.h:273:	Channel	*c;	/* chan(void(*)(Xfid*)) */
+dat.h:282:	Channel	*flushc;	/* channel(int) to notify us we're being flushed */
+dat.h:286:	Channel*	xfidinit(void);
+dat.h:312:	Channel	*cxfidalloc;	/* chan(Xfid*) */
+dat.h:316:Filsys*	filsysinit(Channel*);
+dat.h:330:	Channel	*c;	/* chan(int) */
+dat.h:378:Channel*	winclosechan;
+dat.h:379:Channel*	deletechan;
+
+
+fsys.c:128:filsysinit(Channel *cxfidalloc)
+fsys.c:132:	Channel *c;
+
+rio.c:41:Channel	*exitchan;	/* chan(int) */
+rio.c:42:Channel	*winclosechan; /* chan(Window*); */
+rio.c:1203:	Channel *cm, *ck, *cctl, *cpid;
+
+time.c:18:static Channel*	ctimer;	/* chan(Timer*)[100] */
+wctl.c:475:	Channel *c;
+wctl.c:498:	Channel *c;
+wind.c:96:wmk(Image *i, Mousectl *mc, Channel *ck, Channel *cctl, int scrolling)
+wind.c:1474:	Channel *pidc;
+xfid.c:39:static	Channel	*cxfidalloc;	/* chan(Xfid*) */
+xfid.c:40:static	Channel	*cxfidfree;	/* chan(Xfid*) */
+xfid.c:97:Channel*
+xfid.c:597:	Channel *c1, *c2;	/* chan (tuple(char*, int)) */
+
+
+dat.h:228:void	wsendctlmesg(Window*, int, Rectangle, Image*);
+fns.h:1:void	keyboardsend(char*, int);
+

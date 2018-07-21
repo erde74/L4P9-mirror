@@ -1,0 +1,19 @@
+
+alias ls            'ls -F'
+alias cd            'cd \!*;echo $cwd'
+alias cp            'cp -i'
+alias mv            'mv -i'
+alias rm            'rm -i'
+alias pwd           'echo $cwd'
+
+alias mule          'emacs -nw'
+# alias emacs         'emacs -nw'
+alias h 	    'history'
+
+alias qemuq  'sudo  qemu  -cdrom lp49-boot.cd -std-vga -net nic  -net tap'
+alias qemu1  'qemu -cdrom lp49-boot.cd -std-vga -net nic -net socket,listen=localhost:1234'
+alias qemu2  'qemu -cdrom lp49-boot.cd -std-vga -net nic,macaddr=52:54:00:12:34:57  -net socket,connect=localhost:1234'
+alias mkcd   'mkisofs -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -o lp49-boot.cd lp49-cd'
+
+alias kfconf   './configure --with-staticlib --with-staticbin --with-staticvm --enable-pure-java-math  --with-awt=no  --prefix=/home/maruyama/Kaffe/prg' 
+

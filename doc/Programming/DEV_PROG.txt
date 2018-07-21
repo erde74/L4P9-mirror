@@ -1,0 +1,1072 @@
+***********************************************************************
+*      How to write core servers (devxxx.c) and device drivers        *
+*                                                                     *
+***********************************************************************
+
+
+
+
+***********************************************************************
+*      How to write core servers (devxxx.c)                           *
+*                                                                     *
+***********************************************************************
+
++--------------------------------------------------------------------+
+|      struct Dev                                                    |
++--------------------------------------------------------------------+
+<<< file >>>   port/portdat.h 
+
+
+struct Dev
+{
+        int     dc;
+        char*   name;
+
+        void    (*reset)(void);
+        void    (*init)(void);
+        void    (*shutdown)(void);
+        Chan*   (*attach)(char*);
+        Walkqid*(*walk)(Chan*, Chan*, char**, int);
+        int     (*stat)(Chan*, uchar*, int);
+        Chan*   (*open)(Chan*, int);
+        Chan*   (*create)(Chan*, char*, int, ulong);  //% nil:ERR <- void
+        int     (*close)(Chan*);                    //% ONERR <- void
+        long    (*read)(Chan*, void*, long, vlong);
+        Block*  (*bread)(Chan*, long, ulong);
+        long    (*write)(Chan*, void*, long, vlong);
+        long    (*bwrite)(Chan*, Block*, ulong);
+        int     (*remove)(Chan*);    //% ONERR <- void
+        int     (*wstat)(Chan*, uchar*, int);
+        void    (*power)(int);  /* power mgt: power(1) => on, power(0) => off */
+        int     (*config)(int, char*, DevConf*); //% ONERR<-void
+};
+
+<<< dc >>>
+$       pnp
+/       root
+A       audio
+A       uda1341
+B       bridge
+C       ce
+D       ssl
+E       sdp
+F       flash
+I       ip
+K       kprof
+L       lpt
+M       mnt
+P       arch
+R       ramfs
+S       sd
+T       lm78
+U       usb
+V       lml
+V       tv
+X       loopback
+Y       pccard
+a       tls
+b       irq
+c       cons
+d       dup
+e       env
+f       floppy
+g       segment
+i       draw
+k       fs
+l       ether
+m       mouse
+m       penmouse
+p       proc
+r       rtc
+r       µc
+s       srv
+t       uart
+v       vga
+w       wd
+y       i82365
+y       pcmcia
+|       pipe
+¤       cap
+κ       kbmap
+
+
+
++--------------------------------------------------------------------+
+|      pc/config-l4.c                                                |
++--------------------------------------------------------------------+
+* Installed Dev-programs must be registered in devtab[] 
+
+Dev* devtab[]={
+        &rootdevtab,
+        &consdevtab,
+        &archdevtab,
+        //%     &pnpdevtab,
+        &envdevtab,
+        &pipedevtab,
+        //%     &procdevtab,
+        &mntdevtab,
+        &srvdevtab,
+        &dupdevtab,
+        //%     &rtcdevtab,
+        //%     &ssldevtab,
+        //%     &tlsdevtab,
+        //%     &capdevtab,
+        //%     &kprofdevtab,
+        &etherdevtab,
+        &ipdevtab,
+        //%     &drawdevtab,
+        //%     &mousedevtab,
+        //%     &vgadevtab,
+        //%     &kbmapdevtab,
+                &sddevtab,    // bind -a #SsdC0  /dev
+        &floppydevtab,
+        //%     &lptdevtab,
+        //%     &audiodevtab,
+        //%     &pccarddevtab,
+        //%     &i82365devtab,
+        //%     &uartdevtab,
+                &usbdevtab,
+        &ramfsdevtab,
+        nil,
+};
+
+
++--------------------------------------------------------------------+
+|      port/dev.c                                                    |
++--------------------------------------------------------------------+
+
+
+int devno(int c, int user)
+{
+        int i;
+        for(i = 0; devtab[i] != nil; i++) {
+                if(devtab[i]->dc == c)
+                        return i;
+        }
+        return -1;
+}
+
+
+
++--------------------------------------------------------------------+
+|       pc/devrtc.c                                                  |
++--------------------------------------------------------------------+
+
+
++--------------------------------------------------------------------+
+|       port/devdup.c                                                |
++--------------------------------------------------------------------+
+
+
++--------------------------------------------------------------------+
+|       port/devenv.c                                                |
++--------------------------------------------------------------------+
+
+
++--------------------------------------------------------------------+
+|       port/devloopback.c                                           |
++--------------------------------------------------------------------+
+
+
++--------------------------------------------------------------------+
+|       port/devmnt.c                                                |
++--------------------------------------------------------------------+
+
+* convert Dev-functhion call to Remote Procedure Call.
+
+* This is one of the most interesting Plan9 programs.
+
+
+/*                          bogus.chan
+ *     --> +-- Chan  --+       +-- Chan --+    m-> +-- Mnt ---+    r-> +- Mntrpc -+
+ *         | type: 'M' |       |          |        |          |        |          |
+ *         |           |       |          |<-------|--c       |        |  c       |
+ *         | mchan ----|-----> |          |        |          |        |  |       |
+ *         | mqid      |       | mux -----|------> |          |        |  |       |
+ *         |           |       |          |        +----------+        +--|-------+
+ *         +-----------+ <-+   +----------+                               |
+ *                         +----------------------------------------------+
+ */
+
+
+  portdat.h
+  struct Mnt
+  {
+    Lock    _lock; //%
+    Chan    *c;     // Channel to file service
+    Proc    *rip;   // Reader in progress
+    Mntrpc  *queue; // Queue of pending requests on this channel
+    ulong   id;     // Multiplexer id for channel check
+    Mnt     *list;  // Free list
+    int     flags;  // cache
+    int     msize;  // data + IOHDRSZ
+    char    *version; // 9P version
+    Queue   *q;       // input queue
+  };
+
+struct Mntrpc
+{
+        Chan*   c;       //Channel for whom we are working 
+        Mntrpc* list;    //Free/pending list 
+        Fcall   request; //Outgoing file system protocol message 
+        Fcall   reply;   //Incoming reply 
+        Mnt*    m;       //Mount device during rpc 
+        Rendez  r;       //Place to hang out
+        uchar*  rpc;     //I/O Data buffer 
+        uint    rpclen;  //len of buffer 
+        Block   *b;      //reply blocks 
+        char    done;    //Rpc completed 
+        uvlong  stime;   //start time for mnt statistics 
+        ulong   reqlen;  //request length for mnt statistics 
+        ulong   replen;  //reply length for mnt statistics 
+        Mntrpc* flushed; //message this one flushes 
+};
+
+
+
+
++--------------------------------------------------------------------+
+|       port/devpipe.c                                               |
++--------------------------------------------------------------------+
+* Bidirectional que
+
+* Queue is implemented by port/qio.c
+
+
+<<< SYSTEM CALL >>>
+
+* Pipe object is created by following stpe:
+
+* syspipe(...)
+    :
+    namec("#|", Atodir, 0, 0)  --- in  port/chan.c
+      :
+      c = devtab[t]->attach(up->genbuf+n); 
+        :
+        pipeattach(char * spec)   --- in devpipe.c
+          :
+          c = devattach("|", spec);
+          p = malloc(sizeof(Pipe))  <==== Here !
+          : 
+
+
+
+
++--------------------------------------------------------------------+
+|       port/devroot.c                                               |
++--------------------------------------------------------------------+
+
+
+
++--------------------------------------------------------------------+
+|       port/devsd.c                                                 |
++--------------------------------------------------------------------+
+
+#define QID(d,u, p, t)  (((d)<<DevSHIFT)|((u)<<UnitSHIFT)|\
+                                         ((p)<<PartSHIFT)|((t)<<TypeSHIFT))
+/*
+ *      +---8---+---8---+---8---+--4-+
+ *      | Dev   | Unit  | Part  |Type|
+ *      +-------+-------+-------+----+
+ */
+
+<<< PROBE >>>
+
+  sdreset()
+    :
+    for(...) { ... sdev = sdifc[i]->pnp(); .....} 
+      :
+      atapnp() --- in pc/sdata.c
+        :
+        sdev = ataprobe(0x1F0, 0x3F4, IrqATA0)
+        sdev = ataprobe(0x170, 0x374, IrqATA1)
+        p = pcimatch(p, 0, 0);
+    :
+    sdadddevs(sdev)
+      :
+
+
+
+
++--------------------------------------------------------------------+
+|       port/devsrv.c                                                |
++--------------------------------------------------------------------+
+
+* Service links ( connections or pipes to servers) are registered.
+
+
++--------------------------------------------------------------------+
+|       port/devramfs.c                                              |
++--------------------------------------------------------------------+
+
+
+
++--------------------------------------------------------------------+
+|       port/devether.c                                              |
++--------------------------------------------------------------------+
+
+<<< reset and probe >>>
+
+* boot
+    :
+    main()   --- in pc/main-l4.c
+      :
+      links( )  --- in pc/config-l4.c
+        :
+        ether79c970link()  --- in pc/ether79c970.c
+          |
+          addethercard('AMD79C970", reset)  --- in pc/devether.c
+            : Here, reset() routine is registaerd in the cards[].
+            :
+      +-----+
+      :
+      chandevreset()  --- in port/chan.c
+        : for(..)devtab[i]->reset();
+        :
+        etherreset() --- in pc/devether.c
+          :
+          etherprobe()  --- in pc/devether.c
+            : _bootargs[] is consulted and
+            :   "ether0=type=79c790\n" is found.
+            : This driver is accepted.
+      +-----+
+      :
+      chandevinit()   ----
+        :  for(..)devtab[i]->init();
+        :
+
+
+<<< Block* etheriq(Ether* ether, Block* bp, int fromwire) >>>
+
+* Ether derivers call etheriq() to deliver received packets.
+
+
+<<< int etheroq(Ether* ether, Block* bp) >>>
+
+* etheroq() passes blocks to be sent to approproate one through qbwrite(ether->oq, bp);
+
+
+
++--------------------------------------------------------------------+
+|       port/devenv.c                                                |
++--------------------------------------------------------------------+
+
+
+
++--------------------------------------------------------------------+
+|       pc/devarch.c                                                 |
++--------------------------------------------------------------------+
+
+
+
++--------------------------------------------------------------------+
+|       pc/devcons.c                                                 |
++--------------------------------------------------------------------+
+
+
+
+
++--------------------------------------------------------------------+
+|       pc/devflopppy.c                                              |
++--------------------------------------------------------------------+
+
+
+
++--------------------------------------------------------------------+
+|       pc/devi82364.c                                               |
++--------------------------------------------------------------------+
+
+
+
++--------------------------------------------------------------------+
+|       pc/devrtc.c                                                  |
++--------------------------------------------------------------------+
+
+
++--------------------------------------------------------------------+
+|       pc/devusb.c                                                  |
++--------------------------------------------------------------------+
+
+
+
+
+
+********************************************************
+*       How to program device drivers                  *
+*       (C) KM   080507                                *
+********************************************************
+
++------------------------------------------------+
+|    IO space                                    | 
++------------------------------------------------+
+
+<<< CURRENTLY >>>
+* Curently, processes are allowed to access the IO space. 
+
+* In future, access protection will be provided using L4 IO-Fpage.
+  --> You  are hoped to implement it.
+
+* See:  pc/devarch.c
+
+<<< TODO >>>
+
+* Access protection
+
+
+
++------------------------------------------------+
+|    Physical memory access in the PC processD   | 
++------------------------------------------------+
+
+* Drivers are sometimes required to access physicall address.
+
+<<< Currently >>>
+* Following applies only to the core process (i.e. PC process).
+
+(1) Areas allocated by malloc(): 
+
+    PADDR(logicalAddress)  --returns--> physycalAddress
+    KADDR(physicalAddress) --returns--> logicalAddress
+
+(2) BIOS area:  not yet supported
+
+(3) 
+
+
+<<< TODO >>>
+
+
++------------------------------------------------+
+|    Configuration                               | 
++------------------------------------------------+
+
+* See:  pc/config-l4.c
+        pc/main-l4.c
+
+
+
+<<< "Dev* devtab[]" in pc/config-l4.c.>>>
+
+* Program "devxxx.c" represents the xxx device.
+
+* Each device program has "xxxdevtab" table.
+
+* "xxxdevtab" must be registered into devtab[].
+
+    Dev* devtab[]={
+        ....
+        &etherdevtab,
+        ....
+     };
+
+
+<<< "links()" in pc/config-l4.c >>>
+
+* Some drivers has xxxlink() function.
+
+* xxxlink() must be called from links()" in pc/config-l4.c.
+
+    void links() 
+    {
+       ....
+      ether79c970link();
+       .....
+    }
+
+
+<<< Configuration data in pc/config-l4.c>>
+
+*Currently, following is defined.  
+
+  char __bootline[64];
+  
+  char __bootargs[2048] =
+  	"bootfile=sdC0!9fat!9pcauth\n"
+  	"monitor=multisync65\n"
+  	"vgasize=1024x768x16\n"
+  	"bootargs=local -B 4096\n"
+  
+  	"ether0=type=79c790\n"
+  	"mouseport=ps2\n"
+  	"console=1 b19200\n"
+  	"baud=19200\n"
+  	"sdC0part=dos 63 1000/plan9 1001 2000\n"
+  	"sdD0part=dos 63 2000/plan9 2001 3000\n"
+	;
+
+
+
++------------------------------------------------+
+|    INTERRUPT HANDLER                           | 
++------------------------------------------------+
+
+<<< FILES >>>
+
+   src/libl4com/l4-p9-irq.c
+
+<<< FUNCTIONS >>>
+
+void p9_register_irq_handler(int irq, void (*func)(void*, void*),
+                             void* arg, char *name);
+
+void  intrenable(int irq, void (*f)(void*, void*), void* a, int tbdf, char *name);
+
+void p9_unregister_irq_handler(int irq);
+
+int intrdisable(int irq, void (*f)(void *, void *), void *a, int tbdf, char *name);
+
+
+<<< EXAMPLES >>>
+
+* Followings are example of Interrupt handlers.
+
+devether.c:448:
+   intrenable(ether->_isaconf.irq, ether->interrupt, ether, ether->tbdf, name); 
+
+devi82365.c:671:
+                intrenable(cp->irq, i82365intr, 0, BUSUNKNOWN, buf);
+
+devpccard.c:641:
+               intrenable(pci->intl, cbinterrupt, cb, pci->tbdf, "cardbus");
+
+devusb.c:470:
+   intrenable(uh->_isaconf.irq, uh->interrupt, uh, uh->tbdf, name); 
+
+kbd.c:534:
+      intrenable(IrqAUX, i8042intr, 0, BUSUNKNOWN, "kbdaux"); //%
+
+kbd.c:581:
+      intrenable(IrqKBD, i8042intr, 0, BUSUNKNOWN, "kbd");  //%
+
+main-l4.c:700:
+          intrenable(IrqIRQ13, matherror, 0, BUSUNKNOWN, "matherror");
+
+sdata.c:2189:
+   intrenable(ctlr->irq, atainterrupt, ctlr, ctlr->tbdf, name);
+
+
+<<< HOW IT WORKS >>>
+
+(1) Interrupt handler registration
+     See above examples.
+
+
+(2) Interrupt-handler thread
+
+* main() -- in pc/main-l4.c 
+    :
+    p9_irq_init()    -- in src/libl4com/l4-p9-irq.c
+    :   Here, a interrupt-handler thread is created.
+    :
+
+* The Interrupt handlers are executed by this thread.
+
+
+(3) L4 interrupt message.
+
+* Device  
+  --> interrupt
+       --> L4microKernel
+            --> interruptMessage
+                 --> Interrupt handler thread
+                     --> Interrupt handler is executed. 
+
+
+
++------------------------------------------------+
+|    pc/pci.c                                    | 
++------------------------------------------------+
+
+<<< Physical address access >>>
+
+* pci.c reads the BIOS area  (0x000F_0000 .. 0x000F_FFFF) 
+  to search for PCI interrupt routing table.
+
+
+static void pcirouting(void) 
+{
+   ....
+        // Search for PCI interrupt routing table in BIOS
+704:    for(p = (uchar *)KADDR(0xf0000); p < (uchar *)KADDR(0xfffff); p += 16)
+                if(p[0] == '$' && p[1] == 'P' && p[2] == 'I' && p[3] == 'R')
+                        break;
+708:    if(p >= (uchar *)KADDR(0xfffff))
+	      return;
+   ....
+}
+
+
+<<< Functions >>>
+
+int     pciscan(int, Pcidev**);
+ulong   pcibarsize(Pcidev*, int);
+
+--- read PCI configuration register --------
+int     pcicfgr8(Pcidev*, int);
+int     pcicfgr16(Pcidev*, int);
+int     pcicfgr32(Pcidev*, int);
+
+--- write PCI configuration register --------
+void    pcicfgw8(Pcidev*, int, int);
+void    pcicfgw16(Pcidev*, int, int);
+void    pcicfgw32(Pcidev*, int, int);
+
+void    pciclrbme(Pcidev*);
+void    pciclrioe(Pcidev*);
+int     pcigetpms(Pcidev*);
+void    pcihinv(Pcidev*);
+uchar   pciipin(Pcidev*, uchar);
+
+--- search PCI device -------
+Pcidev* pcimatch(Pcidev* prev, int vid, int did);
+	// if (prev==nil) prev = pcilist;
+Pcidev* pcimatchtbdf(int tbdf);
+
+void    pcireset(void);
+void    pcisetbme(Pcidev*);
+void    pcisetioe(Pcidev*);
+int     pcisetpms(Pcidev*, int);
+
+
+
+<<< BUGs TO BE FIXED >>>
+
+* Current code misbehaves in reading BIOS area.
+
+* Code must be amended.
+     - mx-pager 
+     - pci.c
+
+
++------------------------------------------------+
+|    pc/usbuhci.c                                | 
++------------------------------------------------+
+
+<<< Physical address access >>>
+
+* structure TD and QH include physical address.
+
+* UHCI devices do their job using these physical addresses.
+
+* TD and QH areas are allocated by xspanalloc in xalloc-l4.c,
+  therefore, KADDR() translates pysical tological address,
+  and PADDR() translates logical to pysical address.
+
+
+struct TD  // Transfer descriptor
+{
+        ulong   link;           /* Phys-addr */
+        ulong   status;   
+        ulong   dev;
+        ulong   buffer;         /* Phys-addr */
+
+        ulong   flags;
+        union{
+                Block*  bp;     /* non-iso */
+                ulong   offset; /* iso */
+        };
+        Endpt*  ep;
+        TD*     next;
+};
+
+#define TFOL(p) ((TD*)KADDR((ulong)(p) & ~(0xF|PCIWINDOW)))
+
+struct QH  // Queu Head
+{
+        ulong   head;      /* Phys-addr */
+        ulong   entries;   /*Phys-address of next TD or QH to process (updated by controller) */
+
+        /* software */
+        QH*     hlink;
+        TD*     first;
+        QH*     next;           /* free list */
+        TD*     last;
+        ulong   _d1;            /* fillers */
+        ulong   _d2;
+};
+#define QFOL(p) ((QH*)KADDR((ulong)(p) & ~(0xF|PCIWINDOW)))
+
+
+<<< Macros >>>
+
+pc/io.h:228:#define PCIWINDOW        0
+pc/io.h:229:#define PCIWADDR(va)     (PADDR(va)+PCIWINDOW)
+
+pc/fns.h:180:#define KADDR(a)        kaddr(a)
+pc/fns.h:181:#define PADDR(a)        paddr((void*)(a))
+
+
+
+<<< Where >>>
+
+usbuhci.c:187:#define   TFOL(p) ((TD*)KADDR((ulong)(p) & ~(0xF|PCIWINDOW)))
+usbuhci.c:203:#define   QFOL(p) ((QH*)KADDR((ulong)(p) & ~(0xF|PCIWINDOW)))
+usbuhci.c:814:          while(*addr != PADDR(td)) {
+
+
+
+
++------------------------------------------------+
+|    pc/devusb.c                                 | 
++------------------------------------------------+
+
+* Following must be checked.
+*  (uh->_isaconf.mem==0)?  
+
+
+Usbhost *usbprobe( ...)
+{
+  ......
+devusb.c:479:       PADDR(uh->_isaconf.mem));	
+  .....
+}
+
+
++------------------------------------------------+
+|    pc/kbd.c                                    | 
++------------------------------------------------+
+
+* Following must be checked.
+* What location 0x472 is ?s 
+
+
+kbd.c:234:      ushort *s = KADDR(0x472);
+
+
+<<< NEEDS ACTION >>>
+
+
+
++------------------------------------------------+
+|    pc/devi82365.c                              | 
++------------------------------------------------+
+
+<<< WHAT >>>
+   PCMCIA controller 
+
+<<< STATUS >>>
+
+* Not yet enabled.
+* To work or not to work, that is not checked.
+
+<<< Code >>>
+
+devi82365.c:774:                memmoveb(ac, KADDR(m->isa + offset - m->ca), i);
+devi82365.c:861:                memmoveb(KADDR(m->isa + offset - m->ca), ac, i);
+devi82365.c:1044:       p = KADDR(m->isa + pp->cfg[0].caddr - m->ca);
+
+devi82365.c:320:                m->isa = PADDR(umbmalloc(0, len, Mgran));
+
+
++------------------------------------------------+
+|    pc/devpccard.c                              | 
++------------------------------------------------+
+
+devpccard.c:973:        cis.cisbase = KADDR(m->isa);
+devpccard.c:1163:               p = KADDR(m->isa + pi->conf_addr + Rconfig - m->ca);
+devpccard.c:1207:       cis.cisbase = KADDR(m->isa);
+devpccard.c:1537:               m->isa = PADDR(umbmalloc(0, len, Mgran));
+
+
+
++------------------------------------------------+
+|    pc/ether79c970.c                            | 
++------------------------------------------------+
+
+<<< WHAT >>>
+  LANCE card driver
+
+<<< Phys-mem related CODE >>>
+
+ether79c970.c:256:                      dre->addr = PADDR(dre->bp->rp);
+ether79c970.c:341:              dre->addr = PADDR(bp->rp);
+ether79c970.c:421:                              dre->addr = PADDR(bp->rp);
+ether79c970.c:620:      ctlr->iblock.rdra = PADDR(ctlr->rdr);
+ether79c970.c:621:      ctlr->iblock.tdra = PADDR(ctlr->tdr);
+ether79c970.c:628:      x = PADDR(&ctlr->iblock);
+
+
+* Ring buffers are allocated by xspanalloc().
+
+    static void
+    ringinit(Ctlr* ctlr)
+    {
+        Dre *dre;
+
+        if(ctlr->rdr == 0){
+                ctlr->rdr = xspanalloc(Nrdre*sizeof(Dre), 0x10, 0);
+                for(dre = ctlr->rdr; dre < &ctlr->rdr[Nrdre]; dre++){
+                        dre->bp = iallocb(Rbsize);
+                        if(dre->bp == nil)
+                                panic("can't allocate ethernet receive ring\n");
+                        dre->addr = PADDR(dre->bp->rp);
+                        dre->md2 = 0;
+                        dre->md1 = Own|(-Rbsize & 0xFFFF);
+                }
+        }
+        ctlr->rdrx = 0;
+
+        if(ctlr->tdr == 0)
+                ctlr->tdr = xspanalloc(Ntdre*sizeof(Dre), 0x10, 0);
+        memset(ctlr->tdr, 0, Ntdre*sizeof(Dre));
+        ctlr->tdrh = ctlr->tdri = 0;
+    }
+
+
+* Ring buffer links (dre->addr) must be physical address.
+    struct Dre {      // descriptor ring entry 
+        ulong   addr; // Physical address of dre->bp->rp.
+        ulong   md1;  
+        ulong   md2;  
+        Block*  bp;
+    };
+
+* Memory allocated by xspanalloc() :
+      PhysicalAdddress == PADDR(LogicalAddress)
+
+
+<<< PCI interface >>>
+
+* See:  ether79c970.c: add79c970pci() 
+
+
+<<< HOW ETHER DRIVER IS PROBED AND ACTIVATED >>>
+   
+* See:  etherreset(void)   and  etherprobe(cardno, ctlno).
+
+* See also:  pc/config-l4.c: char _bootargs[]
+   This includes:   "ether0=type=79c790\n"
+
+
+<<< STARTUP >>>
+
+* boot
+    :
+    main()   --- in pc/main-l4.c
+      :
+      links( )  --- in pc/config-l4.c 
+        :
+        ether79c970link()  --- in pc/ether79c970.c
+          |
+          addethercard('AMD79C970", reset)  --- in pc/devether.c
+	    : Here, reset() routine is registaerd in the cards[].
+            : 
+      +-----+
+      :
+      chandevreset()  --- in port/chan.c
+        : for(..)devtab[i]->reset();
+        :
+        etherreset() --- in pc/devether.c
+          :
+          etherprobe()  --- in pc/devether.c
+            : _bootargs[] is consulted and 
+            :   "ether0=type=79c790\n" is found.
+            : This driver is accepted.
+      +-----+
+      :
+      chandevinit()   ----
+        :  for(..)devtab[i]->init();
+        :
+
+
+
+<<< HOW TO REGISTER DEVICE DRIVERS >>>
+
+*  See: 
+    addethercard(char * cardname, (*reset)(Ether *));
+
+
+(1) Add the devether device-table in "Dev* devtab[]" in pc/config-l4.c.
+    Dev* devtab[]={
+        ....
+        &etherdevtab,
+        ....
+     };
+
+
+(2) Add the drive in  "links()" in pc/config-l4.c.
+    void links() 
+    {
+       ....
+      ether79c970link();
+       .....
+    }
+
+
+
++------------------------------------------------+
+|    pc/ether8169.c                              | 
++------------------------------------------------+
+
+
+
+<<< STARTUP >>>
+
+* boot
+    :
+    main()   --- in pc/main-l4.c
+      :
+      links( )  --- in pc/config-l4.c 
+        :
+        ether79c970link()  --- in pc/ether79c970.c
+          |
+          addethercard('AMD79C970", reset)  --- in pc/devether.c
+	    : Here, reset() routine is registaerd in the cards[].
+            : 
+      +-----+
+      :
+      chandevreset()  --- in port/chan.c
+        : for(..)devtab[i]->reset();
+        :
+        etherreset() --- in pc/devether.c
+          :
+          etherprobe()  --- in pc/devether.c
+            : _bootargs[] is consulted and 
+            :   "ether0=type=79c790\n" is found.
+            : This driver is accepted.
+      +-----+
+      :
+      chandevinit()   ----
+        :  for(..)devtab[i]->init();
+        :
+
+
+
+<<< HOW TO REGISTER DEVICE DRIVERS >>>
+
+*  See: 
+    addethercard(char * cardname, (*reset)(Ether *));
+
+
+(1) Add the devether device-table in "Dev* devtab[]" in pc/config-l4.c.
+    Dev* devtab[]={
+        ....
+        &etherdevtab,
+        ....
+     };
+
+
+(2) Add the drive in  "links()" in pc/config-l4.c.
+    void links() 
+    {
+       ....
+      ether8169link();
+       .....
+    }
+
+(3) 
+    void ether8169link(void)
+    {
+        addethercard("rtl8169", rtl8169pnp);
+    }
+
+(4)
+    static int rtl8169pnp(Ether* edev)
+    {
+        Pcidev *p;
+        Ctlr *ctlr;
+        .....                                                                                  
+        //Make a list of all ethernet controllers if not yet
+        if(ctlrhead == nil){
+                p = nil;
+                while(p = pcimatch(p, 0, 0)){
+                        if(p->ccrb != 0x02 || p->ccru != 0)
+                                continue;
+                        ctlr = malloc(sizeof(Ctlr));
+                        ctlr->pcidev = p;
+                        ctlr->id = (p->did<<16)|p->vid;
+                                                                                  
+                        if(ctlrhead != nil)
+                                ctlrtail->next = ctlr;
+                        else
+                                ctlrhead = ctlr;
+                        ctlrtail = ctlr;
+                }
+        }
+                                                                                  
+        id = 0;
+        for(i = 0; i < edev->nopt; i++){
+                if(cistrncmp(edev->opt[i], "id=", 3) == 0)
+                        id = strtol(&edev->opt[i][3], nil, 0);
+        }
+                                                                                  
+        ctlr = nil;
+        if(id != 0)
+                ctlr = rtl8169match(edev, id);
+        else for(i = 0; rtl8169pci[i].name; i++){
+                if((ctlr = rtl8169match(edev, rtl8169pci[i].id)) != nil)
+                        break;
+        }
+        if(ctlr == nil)
+                return -1;
+                                                                                  
+        edev->ctlr = ctlr;
+        edev->port = ctlr->port;
+        edev->irq = ctlr->pcidev->intl;
+        edev->tbdf = ctlr->pcidev->tbdf;
+                                                                                  
+        memset(ea, 0, Eaddrlen);
+        if(memcmp(ea, edev->ea, Eaddrlen) == 0){
+                i = csr32r(ctlr, Idr0);
+                edev->ea[0] = i;
+                edev->ea[1] = i>>8;
+                edev->ea[2] = i>>16;
+                edev->ea[3] = i>>24;
+                i = csr32r(ctlr, Idr0+4);
+                edev->ea[4] = i;
+                edev->ea[5] = i>>8;
+        }
+                                                                                  
+        edev->attach = rtl8169attach;
+        edev->transmit = rtl8169transmit;
+        edev->interrupt = rtl8169interrupt;
+        edev->ifstat = rtl8169ifstat;
+                                                                                  
+        edev->arg = edev;
+        edev->promiscuous = rtl8169promiscuous;
+                                                                                  
+        rtl8169link(edev);
+                                                                                  
+        return 0;
+}
+
+
+
+
++------------------------------------------------+
+|    pc/dma.c                                    | 
++------------------------------------------------+
+
+
+dma.c:104:      if(bva == nil || PADDR(bva)+64*1024*i8237dma > 16*MB){
+dma.c:157:      xp->bpa = PADDR(xp->bva);
+dma.c:192:      || ((pa=PADDR(va))&0xFFFF0000) != ((pa+len)&0xFFFF0000)
+
+
++------------------------------------------------+
+|    pc/pci.c                                    | 
++------------------------------------------------+
+
+
+
++------------------------------------------------+
+|    pc/fns.h                                    | 
++------------------------------------------------+
+
+fns.h:180:#define  KADDR(a)      kaddr(a)
+fns.h:181:#define  PADDR(a)      paddr((void*)(a))
+
+
+io.h:229:#define PCIWADDR(va)   (PADDR(va)+PCIWINDOW)
+io.h:231:#define ISAWADDR(va)   (PADDR(va)+ISAWINDOW)
+
+main-l4.c:765:  mmuflushtlb(PADDR(m->pdb));
+main-l4.c:835:  mmuflushtlb(PADDR(pdb));
+main-l4.c:844:  (*f)(PADDR(entry), PADDR(code), size);
+mem.h:53:#define        TMPADDR    (KZERO+0x2000)      /* used for temporary mappings */
+mem.h:68: * N.B.  _startPADDR knows that CPU0PDB is the first reserved page
+mp.h:122:       PcmpPADDR       = 0x02,         /* prefetch address */
+
+
+
+

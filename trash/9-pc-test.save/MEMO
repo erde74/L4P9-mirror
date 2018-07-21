@@ -1,0 +1,16 @@
+<><><> To use print() of Plan9-original. <><><>
+
+The gcc libraly libgcc.a is required, and 
+you can find the -L directory as follows:
+
+LIBGCC    = $(dir $(shell $(CC) --print-lib))
+LDFLAGS  += -nostdlib
+LDFLAGS  += -L$(LIBGCC)
+
+
+ex1: ex1.o
+	$(LD) $(LDFLAGS) -e_start -Ttext=$(LINKBASE)  -o $@ \
+	$(CRT0) $^ -ll4 -ll4io -lc  \
+	-lgcc -ll4io
+
+

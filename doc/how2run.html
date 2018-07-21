@@ -1,0 +1,365 @@
+<HTML>	<HEAD>
+        <meta http-equiv="Content-Type" content="text/html; charset=euc">
+	<TITLE>  How to run LP49   </TITLE>
+	</HEAD>
+<BODY BACKGROUND = "../Icons1/bg3.gif">
+
+<!-------------------------------------------------------
+<H2>
+(<A HREF=index-e.html> GO TO  English page </A>)
+(<A HREF=./L4minix.html> GO TO  L4Minix Home Page </A>) </H2><HR>
+------------------------------------------------------->
+
+<IMG SRC="./../gif/A.tanuki1.gif"> 
+
+<H1>  
+<FONT COLOR="#0000FF">
+How to try LP49 ?
+</FONT>
+</H1> 
+
+
+
+
+<H2><IMG SRC="./../gif/dotto.gif" > 
+   Download LP49 tar ball 
+ </H2>
+
+
+<OL>
+<LI> Download tar-ball  "LP49-yymmdd.tarfrom  http://research.nii.ac.jp/H2O/LP49.
+
+<LI>  tar xvf LP49-yymmdd.tar
+
+<LI>  Then, you will find following contents.
+
+<PRE>
+ -- LP49-yymmdd/--+---- bin-14/       
+                  |
+                  +--- doc/          ;; documents.
+                  |
+                  +--- include/      ;; include files
+                  |
+                  +---- lib/         ;; libraries (symbolic links)
+                  |
+                  +---- lp49-boot-x2.fd  ;; Boot floppy image (2.88MB)
+                  |
+                  +---- lp49-boot.fd  ;; Boot floppy image (1.44MB)
+                  |
+                  +---- rootfs/       ;; LP49 binaries (core, servers, commands)
+                  |
+                  +---- src/          ;; LP49 source files
+</PRE>
+
+<LI>  "lp49-boot.fd" and "lp49-boot-x2.fd" are boot-floppy images of 1.44MB and 2.88MB.,
+
+</OL>
+
+
+
+<!--------------------------------------------->
+
+<H2><IMG SRC="./../gif/dotto.gif" > 
+   How to run LP49 
+ </H2>
+
+
+<OL>
+
+<LI>  Boot the PC from the boot-floppy image.
+
+    <UL>
+    <LI> Real PC: <BR>
+        Make a floppy disk from "lp49-boot.fd" usinf Unix dd-command.
+
+    <LI> VMware: <BR>
+        Boot from "lp49-boot.fd" (1.44MB) or "lp49-boot-x2.fd" (2.88MB).
+	To use  2.88MB floppy image, VMware BIOS may need to be set for 2.88MB.
+	
+    <LI> QEMU: <BR>
+        Boot from "lp49-boot.fd" (1.44MB) or "lp49-boot-x2.fd" (2.88MB).
+    </UL>
+
+
+<LI>  Select LP49(HVM+PC+QSH+DOSSRV) from the Menu list 
+
+<LI>  LP49 will start up <BR>
+
+<LI>  Prompt will appear. <br>
+      LP49[/]: _   <BR>
+
+</OL>
+
+
+
+<!--------------------------------------------------------------->
+
+
+<H2><IMG SRC="./../gif/dotto.gif" > 
+<A HREF=./qsh-cmnd.html>  Using QSH (Quasi shell for debuggin)  </A>
+</H2>
+
+QSH is a quasi shell for LP49 debugging. 
+At start-up, QSH sets up following features.
+
+
+<UL>
+
+<LI>  Stdin, stdout and  stderr  are set.
+
+<LI>  Ram file system (#R: devramfs) is bound at /tmp.
+
+<LI>  Service registray (#s: devsrv) is bound at /srv.
+
+<LI>  FDD driver is bound at /dev/fd0disk, 
+       and its DOS file system is  mounted at /t.
+
+
+<LI>  To use network services, use ipsetup command. <BR>
+      LP49[/]  ipsetup  IPAddress   GataWayAddress  <BR> 
+
+<LI>  QSH is a simple shell for debugging, and  has several built-in commands. <BR>
+      Ex.  ls, cd, pwd, cat, echo,  .....
+
+<LI> Root directory: you will find followong list.
+<PRE>
+LP49[/]: ls
+d r-xr-xr-x     0  boot/ ....
+d rwxrwxrwx     0  bin/  .... 
+d rwxrwxrwx     0  dev/  .... 
+d rwxrwxrwx     0  env/  .... 
+d rwxrwxrwx     0  fd/  .... 
+d rwxrwxrwx     0  mnt/  .... 
+d rwxrwxrwx     0  net/  .... 
+d rwxrwxrwx     0  net.alt/  .... 
+d rwxrwxrwx     0  proc/  .... 
+d rwxrwxrwx     0  root/  .... 
+d rwxrwxrwx     0  srv/  .... 
+d rwxrwxrwx     0  tmp/  .... 
+d rwxrwxrwx     0  work/  .... 
+d rwxrwxrwx     0  n/  .... 
+d rwxrwxrwx     0  t/  .... 
+d rwxrwxrwx     0  ums/  .... 
+
+LP49[/]: ls /t/b
+- rwxrwxrwx  ....  cmd.zip  ....
+- rwxrwxrwx  ....  srv      ....
+- rwxrwxrwx  ....  ls       ....
+- rwxrwxrwx  ....  cmd.zip  ....
+- rwxrwxrwx  ....  cmd.zip  ....
+</PRE>
+
+* Floppy disk is mounted on /t. 
+* cmd.zip is a zip file containing several commands.
+
+
+<LI>  Boot FDD is too small to carry commands in flat, and several commands are 
+      included as cmd.zip file. <BR>
+
+     Do following; then commands are installed in /tmp. <BR>
+
+
+<PRE>
+    LP40[/]: cd /tmp
+    LP40[/tmp]: unzip -f /t/b/cmd.zip
+</PRE>
+
+    Then you will find several commands on /tmp.
+
+<LI>  Try commands.
+<PRE>
+    LP40[/]: cd /tmp
+    LP40[/tmp]: unzip -f /t/b/cmd.zip
+</PRE>
+ 
+
+</UL>
+
+
+<HR 20>
+
+
+<!--------------------------------------------------------------->
+
+<H2><IMG SRC="./../gif/dotto.gif" > 
+<A HREF=./qsh-cmnd.html> QSH (Quasi shell for debuggin) commands </A>
+</H2>
+
+
+
+<!------------------------------------------------------------
+
+
+<H3><IMG SRC="./../gif/dotto.gif" >
+   DOS file server is mounted.
+</H3>
+                              
+
+<OL>
+
+<LI>  Service registrator  (devsrvis started.<BR>
+LP49[/]:  bind -a #s  /srv
+
+<LI>  Bind the floppy disk onto /dev. <BR>
+
+LP49[/]:  bind -a #f  /dev  <BR>
+        ==> Floppy will be bound as /dev/fd0disk 
+                                
+<LI>  Start up the DOS file server <BR>
+                                                                
+LP49[/]:  dossrv  <BR>
+        ==> DOS-file-server is registered in /srv as /srv/dos.
+
+<LI> Mount the DOS file server (/srv/dos) onto /dev/fd0disk <BR>  
+
+LP49[/]:  mount -a  /srv/dos  /tmp  /dev/fd0disk    <BR>
+        ==> DOS-file-server is mounted at /tmp directory.  <BR>
+
+
+<LI> DOS   <BR>
+LP49[/]:  ls /tmp
+                                                                   
+</OL>
+
+
+
+
+<H3><IMG SRC="./../gif/dotto.gif" >
+   
+</H3>
+
+<OL>
+<LI>  <BR>
+
+LP49[/]:  bind -a #s  /srv  <BR>
+LP49[/]:  bind -a #f  /dev  <BR>
+LP49[/]:  dossrv  <BR>
+LP49[/]:  mount -a  /srv/dos  /tmp  /dev/fd0disk    <BR>
+LP49[/]:  ls /tmp
+
+<LI>  <BR>
+LP49[/]:  spawn  /tmp/ex1    <BR>
+      /tmp/ex
+
+<LI>   /tmp/exをspaw <BR>
+LP49[/]:  spawn  /tmp/ex2 10   <BR>
+        /t/tmp/ex
+
+</OL>
+
+
+
+
+<H3><IMG SRC="./../gif/dotto.gif" >
+   RAM  バ RAMF
+</H3>
+
+<OL>
+<LI>  , RAM   Dい
+
+LP49[/]:  bind -a #s  /srv  <BR>
+LP49[/]:  bind -a #f  /dev  <BR>
+LP49[/]:  dossrv  <BR>
+LP49[/]:  mount -a  /srv/dos  /tmp  /dev/fd0disk    <BR>
+LP49[/]:  ls /tmp
+
+<LI>  RAM    RAMFS /tmp/ramf  spaw <BR>
+LP49[/]:  spawn  /tmp/ramfs -D -S ramfs    <BR>
+        RAMFS   /srv/ramf
+
+<LI>  RAM   RAMF   /wor   <BR>
+LP49[/]:  mount -ac /srv/ramfs  /work    <BR>
+
+</OL>
+
+
+
+<H3><IMG SRC="./../gif/dotto.gif" >
+   Protocol stack 
+</H3>
+
+<OL>
+
+<LI> Ether    /net   <BR>
+LP49[/]; bind -a #l /net   <BR>
+        ==> Ether device  /net  <BR>
+            /  net/ethe <BR>
+  
+<LI> Internet Protocol Stack  /net   <BR>
+LP49[/];  bind -a #I0 /net  <BR>
+        ==> Internet Protocol Stack   /net     <BR>
+            /、/net/tcp, /net/udp, /net/ipifc, /net/icmp,
+            /net/arp, /net/iproute,,,,  <BR>
+  
+<LI> /net/ipifc/clone  open <BR>
+
+LP49[/];  open -w /net/ipifc/clone  <BR>
+         -- returns  fd:0   <BR>
+       ==> clone  oope  
+           
+              /net/ipifc <BR>
+
+<LI>   <BR>
+  
+LP49[/];  write 0 bind ether /net/ether  <BR>
+       ==> NW (FileDescriptor
+           "bind ether /net/ether" <BR>
+
+ 
+<LI> 
+ 
+LP49[/];  write 0 add 192.168.74.100 255:255:255:0   <BR>
+       ==>  
+ 
+ 
+<LI> <BR>
+              [RemoteHost]: ping 192.168.74.100   <BR>
+                  ==> 
+  
+ 
+<LI> /net/tcp/clone 
+LP49[/];  open -w /net/tcp/clone    <BR>
+        -- returns --  fd:1   <BR>
+        ==> /net/tcp/clone open  TCP  (Ex. /net/tcp/0 )
+            
+  
+<LI> <BR>
+
+LP49[/];  write 1 announce 80   <BR>
+        ==> TCP  (Ex. /net/tcp/0 ) <BR>
+
+<LI>   <BR>
+
+              [RemoteHost]: telnet 192.168.74.100 80   <BR>
+                        ==> 
+                            (Ex. /net/tcp/1)   <BR>
+                                                             
+<LI> 
+LP49[/];  cat /net/tcp/1/data    <BR>
+        ==> 
+</OL>
+
+
+--------------------------------------------------------------->
+
+
+
+<HR>
+<H2> <IMG SRC="./../gif/dotto.gif"> Related links </H2>
+
+<UL>
+<LI>	<A HREF="http://l4ka.org/"> L4 micro kernel </A>	
+<LI>	<A HREF="http://netlib.bell-labs.com/plan9/"> Plan 9 from Bell Labs	</A>	
+<LI>    <A HREF="http://www.vmware.com/"> VMware </A>	
+<LI>    <A HREF="http://bellard.org/qemu/"> QEMU </A>	
+
+</UL>
+
+
+
+<HR>
+ Last Modified 2008-09-20, NII
+</HTML>
+
+
+

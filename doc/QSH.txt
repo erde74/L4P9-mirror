@@ -1,0 +1,313 @@
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>          QSH Command examples                        <>
+<>            2008/11/04                                <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+==========================================================
+#      What is QSH (quasi shell) ?                       #
+==========================================================
+
+<> QSH is a (dirty) shell for LP49 debugging, 
+   thus considerable system calls are supported as build-in commands.
+
+   - make up namespace
+   - execute commands
+
+<> QSH is started as follows:
+
+   HVM process                             Cf. src/9/hvm
+      -->  PC process  (core process)      Cf. src/9/{pc, port, ip}
+           -->  QSH process                Cf. src/9/qsh
+		--> DOSSRV process         Cf. src/cmd/dossrv
+
+   QSH spawns DOSSRV to serve the boot floppy image.
+
+<> In future, QSH will/shall be replaced by boot-init process and rc process.
+
+   HVM process    Cf. src/9/hvm
+      -->  PC process  (core process)   Cf. src/9/{pc, port, ip}
+           -->  BOOT-INIT process       Cf. src/9/boot
+	        --> DOSSRV etc..        Cf. src/cmd/
+		--> RC process          Cf. src/cmd/rc 
+
+
+<> QSH builds the initial name space.  
+
+   /dev	       devices (#c=console, #f=floppy,,,) are bound.
+   /env	       Enviroment variable (#e) is bound
+   /srv	       Server repository.
+   /proc       .. not yet work ...
+   /tmp	       Ram file (#R) is bound.
+   /net	       Protocol stack(#I), EtherDriver(#l) are bound.
+   /t	       Boot Floppy image is mounted.
+
+
+<> Storage service 
+   (a) Boot floppy image is mounted an "/t".
+
+     --/ -- t/ --+--- boot/ --- grub/ --- menu.lst
+                 |
+                 +-- kickstart-0804.gz  :  L4 startup 
+                 +-- l4ka-0804.gz       :  L4 micro kernel
+                 +-- sigma0-0805.gz     :  L4 sigma0 pager
+                 |
+                 +--- a/ ---- +---hvm,gz   : Hypervisor process (only name)
+                 |            +-- pc.gz    : LP49 core process (user mode, off course)
+                 |            +-- qsh.gz   : Quasi shell (Shell for debugging)
+                 |            +-- dossrv.gz : DOS file server  
+                 |
+                 +--- b/ -----+-- cmd.zip  : zip files containing several commands
+                              +-- srv      : srv command
+                              +-- ex2      : program example
+                              +-- rc       : Shell ported from Plan9
+                              :
+                              :
+
+    (b) RAM file system ( /src/9/port/devramfs.c) is mounted at "/tmp".
+        You  can create temporal files.
+
+
+==========================================================
+#      QSH (quasi shell) built-in commands               #
+#      [1]  General commands                             #
+==========================================================
+
+
+<>  help
+
+<> unzip -f <zipfile>  
+   Ex.  cd  /tmp
+        unzip -f /t/b/cmd.zip    --- Now, you can see several copmmands on /tmp.
+
+
+<>  tar [cxt][vo][F][f] <tarfile> [<files>...] 
+     -- Not yet implemented
+
+
+<>  ls <path>          show the list of <path> directory 
+<>  ls                 shows the list of current directory
+
+<>  lc <path>          short verion of ls
+<>  lc
+
+<>  cd  [<path>]       changes working directory to <path>
+
+<>  pwd                show the current working directory
+
+<>  pi			pi-value
+
+<>  credits             Contributors 
+
+<>  echo  <any_string>   echo back any-string 
+
+
+<>  cat <path>         displays contents of the file <path>
+
+
+<>  remove  <name>
+<>  rm  <path>         Delete a file         Not-Yet-Implemented
+
+
+<>  exits <msg>
+
+
+<>  mkdir <dirname>             make a new directory
+
+<>  fd2path  <fd> <buf> <len>   Not yet implemented
+
+<>  kd				Enter into the L4 kernel bebugger
+
+
+<>  d  <table-name> <address>    Dump the <table-name> contents at <address>
+	<>  <tblname> ::= chan|ch|namec|dev|mount|mhead|mnt|pgrp|proc  
+	<>  d {up | ns}       dump the current proc or namespace
+
+   Ex.  d  vga  	-- Please try.
+	d  up          -- show the current process table
+	d  ns          -- show the name space of the current process  
+
+<>  dump <process_nr> <start_adrs> <size>      Memory dump  
+
+
+<>  bind [-abcC]  <#newpath>  <mountpoint>
+    -a after
+    -b before
+    -c allow creattion    -ac, -bc 
+
+     Ex.  bind -a #l  /net
+          bind -a #SsdC0  /dev
+
+<>  mount [-abcC] <srvname> <mountpoint> <spec>
+    -a after
+    -b before
+    -c allow creattion    -ac, -bc 
+    -C
+
+    Ex.   mount -c /srv/dos /tmp  /dev/fd0ctl
+
+
+<>  unmount  [<name>] <mntpoint>  
+
+
+<>  putenv  <name>  <value>
+
+<>  getenv  <name> 
+
+
+<>  rfork     
+
+<>  fork  [<pathname>]
+
+<>  exec  <pathname>
+
+
+<>  spawn  <pathname>  <parameters>....
+    --- Spawn a new process
+
+<>  <pathname>  <parameters>....
+    --- Spawn a new process
+
+
+<> ipsetup  [<IPaddress>  <GatewayAddress>]     
+    -- Setup the IPaddress and GatewayAddress.
+    -- Default is:   10.0.0.2  10.0.0.1
+
+<> usbsetup
+     -- Setyup the USB memory 
+
+<> partition
+     -- Get the partition table contents
+
+
+
+==========================================================
+#      QSH (quasi shell) built-in commands               #
+#      [2]  File service test commands                   #
+==========================================================
+
+<>  open    [-rwWxtcde] <name> <mode> 
+    -r Read
+    -w Write
+    -x Executable 
+    ....	
+
+<>  create  [-rwWxc]  <name>  <permission>
+
+<>  close  <fd>
+
+<>  seek  {fd>  <offset>  <type>
+
+
+<>  write <fd> <any_string>
+
+<>  pwrite <fd> <offset> <any_string>
+
+
+<>  read <fd> 
+
+<>  pread  <fd> <offset>         
+
+<>  preadx <fd> <offset> [<size>]  
+	show the contents in Hex and ascii of <fd> file 
+
+<>  pipe
+
+<>  dup <oldfd> <newfd>
+
+
+<>  put <txt>          _write <text>
+<>  putsl              _write $sl 
+<>  get                displays contents _written
+
+
+<>  give <txt>          _write <text>
+<>  givesl              _write $sl
+<>  take                displays contents _written
+                                                                               
+<>  maptest <size>     Test L4 fpage mapping
+<>  pgmap  <procnr> 
+<>  pgmap  <procnr> <adrs> <len>
+
+
+
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>      Debugging support                         <>
+<>           2007/04/22                           <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+=========== [header file] ==================
+
+[Where]  LP49/include/l4/_dbgpr.h
+
+[What]
+
+	extern int  l4printf_b(const char*, ...);
+	extern char l4printgetc();
+ 
+	#define  DBGPRN  if(_DBGFLG) l4printf_b
+	#define  DBGBRK  if(_DBGFLG) l4printgetc
+	#define  DD(x)   if(_DBGFLG) l4printf_b("%s: %x \n", __FUNCTION__, x);
+ 
+	#define  DPR     l4printf_r
+	#define  DPG     l4printf_g
+	#define  DPB     l4printf_b
+
+
+[How to use]
+
+  A user of this file must define _DBGFLG in advance:
+   #define   _DBGFLG 1      //OR*  static int _DBGFLG = 1;
+   #include  "_dbgpr.h"
+
+  _DBGFLG == 1  ==> Enable debug prints
+  _DBGFLG == 0  ==> Disable debug prints
+ 
+
+
+<><><> QSH dump-table commands for debugging <><><>
+
+========[source] ==================
+	src/9/port/_dumptbl.c
+
+
+====================================================
+#      Dump command                                #
+====================================================
+
+LP49[...] d  <table> <parameter>
+
+
+<>	d  chan <Chan-adrs>
+
+<>	d  ch  <Chan-fid>
+
+<>  	d  namec <path-name>      Dump the chan denoted by <path-name>
+
+<>	d  dev   <Dev-adrs>
+
+<> 	d  mount <mount-adrs> 
+
+<> 	d  mhead  <Mhead-adrs>	 
+
+<>	d  mnt	<Mnt-adrs>
+
+<>	d  pgrp  <Pgrp-adrs>
+
+<> 	d  fgrp  <Fgrp-adrs>
+
+<> 	d  proc  <Proc-adrs> 
+
+<>	d  up                    Dump the current Proc-table
+
+<>	d  ns			Dump the current name space (Mhead, Mount,,,,) 
+
+<> 	d  nss                   dumpmount() in  port/chan.c 
+
+<>	d dirtab  <Dirtab-adrs>
+
+<>	d walkqid  <Walkqid-adrs> 
+
+
+

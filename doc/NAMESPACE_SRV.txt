@@ -1,0 +1,430 @@
+Update:    2009/02/10
+
+  LP49 is under implementation, and following information is not confirmed.
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>         Try LP49                                     <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+  [1] Download the LP49-yymmdd.tar file.
+
+      Web site is:  http://research/nii.ac.jp/H2O/LP49
+
+  [2] Followinga are our run-test environment.
+      * Real PC  
+      * Qemu emulator  
+      * VMware
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>         Boot floppy image                            <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+ [1]  LP49 boot floppy images are included in the "LP49-yymmdd.tar file" top directory.
+
+     (a) "lp49-boot.fd:     1.44MB   
+     (b) "lp49-boot-x2.fd:  2.88 MB.  Qemu emulator accepts this one.
+
+ [2] Boot floppy directory structure
+
+     ---+--- boot/ --- grub/ --- menu.lst
+        |
+        +-- kickstart-0804.gz  :  L4 startup 
+	+-- l4ka-0804.gz       :  L4 micro kernel
+	+-- sigma0-0805.gz     :  L4 sigma0 pager
+	|
+	+--- a/ ---- +---hvm,gz   : Hypervisor process (only name)
+	|      	     +-- pc.gz    : LP49 core process (user mode, off course)
+	|	     +-- qsh.gz   : Quasi shell (Shell for debugging)
+	|	     +-- dossrv.gz : DOS file server  
+	|
+	+--- b/ -----+-- cmd.zip  : zip files containing several commands
+	     	     +-- srv      : srv command
+     	 	     +-- ex2      : program example
+		     +-- rc       : Shell ported from Plan9
+		     :
+		     :
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>         Quasi hard disk image for QEMU and VMware    <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+    * Will be provided in near future.
+
+
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>         Name space                                   <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+  [1] Program "src/9/port/devroot.c" provides following directories:
+
+      -- /--+---- boot/
+	    +---- bin/    
+	    +---- dev/     --> See [2], [3]
+	    +---- env/     
+	    +---- fd/
+	    +---- net/
+	    +---- srv/    --> See [4]
+	    +---- tmp/
+	    +---- work/
+	    +---- n/
+	    +---- t/     --> Boot floppy disk is bound.
+	    +---- c/
+	    +---- ums/
+
+  [2]  "/dev" dorectory contains various resources:
+  
+      - dev/
+            bintime
+       	    cons     -- console
+	    consctl  --- console control
+	    drivers
+	    ....
+	    zero
+	    fd0disk
+	    fd0ctl
+
+  [3]  Various devices such as HDD, FDD,,, are bound on "/dev" directory.
+
+  [4] "/srv" is a "Server registray" ( to be explained lator).
+
+  [5] Boot floppy is mounted on "/t", and you can see its contents on it.
+
+    -- /-- t/---+--- boot/ --- grub/ --- menu.lst
+                +-- kickstart-0804.gz  :  L4 startup 
+	        +-- l4ka-0804.gz       :  L4 micro kernel
+		+-- sigma0-0805.gz     :  L4 sigma0 pager
+		|
+		+--- a/ ---- +---hvm,gz   : Hypervisor process (only name)
+		|      	     +-- pc.gz    : LP49 core process (user mode, off course)
+		|	     +-- qsh.gz   : Quasi shell (Shell for debugging)
+		|	     +-- dossrv.gz : DOS file server  
+		|
+		+--- b/ -----+-- cmd.zip  : zip files containing several commands
+	     	     	     +-- srv      : srv command
+     	 	     	     +-- ex2      : program example
+		     	     +-- rc       : Shell ported from Plan9
+		     	     :
+		     	     :
+
+
+  [6] Program "src/9/port/devramfs.c" is a root file system (#R) with following directories:
+
+     --- #R /---+
+                +-- rc/ ----rcmain
+		|
+	        +-- mnt/--- exportfs/  -+--  0 
+                |                       +--- 1
+                |                       +--- 2
+	        +-- tmp/
+		+-- work/
+		+--- n/ 
+		+--- t/
+ 		+--- usr/
+		+--- home/
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>      QSH Name space                                  <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+ [1] QSH does following Name Space operations:
+
+    bind("#c", "/dev", MAFTER);  // bind "console" device onto /dev.
+    fd0 = open("/dev/cons", OREAD));  // standard i/o
+    fd1 = open("/dev/cons", OWRITE));
+    fd2 = open("/dev/cons", OWRITE));
+ 
+    bind("#d", "/fd", 0);          // bind the DEVDUP 
+    bind("#e", "/env", MCREATE);   // bind the DEVENV
+    bind("#p", "/proc", 0);        // bind the DEVPROC
+    bind("#s", "/srv", MREPL|MCREATE);  // bind the "service registry" onto /srv
+    bind("#R", "/", MAFTER|MCREATE);    // bind the "root fs" onto "/"
+    bind("#f", "/dev", MAFTER);    // bind the floppy device onto /dev
+    bind("#I", "/net", MAFTER);  // Capital 'i'
+    bind("#l", "/net", MAFTER);  // Small el
+
+    fd =  open("/srv/dos", ORDWR);
+    mount(fd, -1, "/t", MAFTER, "/dev/fd0disk")
+
+   <remark>
+      No Hard disk devices are bound, and no hard diskes are accessed.
+
+
+  [2] QSH (Quasi shell for debugging) will setup name space as follows:
+
+      -- /--+---- boot/
+	    +---- bin/    
+	    +---- dev/      <-- concole, fd, ether, protocol stacks etc. arw bound.
+            |
+	    +---- env/     
+	    +---- fd/
+	    +---- mnt/
+	    +---- net/
+	    +---- srv/
+	    +---- tmp/
+	    +---- work/
+	    +---- n/
+	    +---- t/--+--- a/        <-- Boot floppy disk is bound
+            |         +--- b/        <-- Commands on bott floppy disk.
+            |
+	    +---- ums/
+            |
+            +----- rc/ --- rcmain             <--- Root file system (#R)
+            +---- mnt/ --- exportfs/ ---
+            |
+            +---- usr/
+            +---- home/
+ 
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>         Devices                                      <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+  [1] Following Plan9 convention, low-level devices are denoted by "#"+"char".
+  
+	    #c   console
+	    #d   dups of open files
+	    #e	 environment variables
+	    #l	 ethernet device (small "el")
+	    #f	 Floppy disk
+	    #I	 IP protocol (large "ai")
+	    #M	 attach to 9P servers (mount service)
+	    #|	 2-way pipe
+  	    #S   Storage device (Hard disk)
+	    #s	 Server registray
+	    #U	 USB host controller
+	    #v	 VGA controller
+	    ....	    
+
+  [2] "bind" command binds devices onto name space.
+
+      LP49[/]:  bind  [ options... ]  deviceName  bindPoint
+
+      --- Ex.---------------------------------------------------
+      LP49[/]:  bind  #c   /dev        --- Console will be bound as /dev/cons ..
+      LP49[/]:  bind  -a   #f   /dev   --- Floppy will be bound as /dev/fd0disk
+      LP49[/]:  bind  -a   #s   /srv   --- Server registray be bound as /srv
+      -----------------------------------------------------------
+
+  [3] QSH (quasi shell) will bind :
+
+    	LP49[/]:  bind  #c /dev
+    	LP49[/]:  bind  #d /fd
+    	LP49[/]:  bind -c #e /env 
+    	LP49[/]:  bind  #p /proc 
+    	LP49[/]:  bind -c #s /srv 
+    	LP49[/]:  bind -ac #R / 
+    	LP49[/]:  bind -a #f /dev 
+    	LP49[/]:  bind -a #I0 /net 
+    	LP49[/]:  bind -a #l /net 
+
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>      Storage devices and File services               <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
++--------------------------------------------------------+
+|      Floppy disk and DOS service                       |
++--------------------------------------------------------+
+  [1] QSH (quasi shell)
+      * At startup time, "QSH" executes following commands,  
+        to allow access to boot floppy contents.
+
+	--- QSH includes --------------------------------
+	% bind -a #f /dev                         --- (a)
+	% mount -a /srv/dos  /t  /dev/fd0disk     --- (b)
+       --------------------------------------------------
+	(a) FDD is bound as  /dev/fd0disk.
+ 	(b) Let DOS file server access "/dev/fd0disk",
+	    and mount the file system on "/t".
+
+
+  [2] Please try, and find boot floppy contents.
+        ------------------------------------------------
+	LP49[/]; ls /t
+	d rwxrwxrwx      0   t/   ......
+          contaisl...
+	d rwxrwxrwx      0   BOOT/   ....
+	d rwxrwxrwx      0   a/   ....
+	d rwxrwxrwx      0   b/   ....
+	  rw-rw-rw-  68612   l4ka-0804.gz       ....
+	  rw-rw-rw-  33451   sigma0-0804.gz     ....
+	  rw-rw-rw-  33094   kickstart-0804.gz  ....
+       --------------------------------------------------
+
+  [3] How to use multiple FDs on VMware
+
+	(1)  Unmount the current FDD.
+
+	       LP49[/]; unmount  <mountpoint>
+	
+ 	  ex.   LP49[/]; unmount  /t
+
+
+	(2) Setup a new FDD on VMware
+
+	  (a)  Click the VMware <VM> tab 
+	  (b)  Select the <Setting> option.
+	  (c)  Select the <Floppy> from the Device list
+	  (d)  In the Connection field, setup the next floppy. 
+		ex.
+		- Use a floppy image
+		[ /home/maruyama/LP49/lp49-boot.fd-ip ]
+	  (e)  Click Save button.
+
+
+	(3)  Mount the new FDD in QSH
+	      LP49[/]; mount -ac /srv/dos  <mountpoint> /dev/fd0disk
+
+
+  [4] How to use lp49-cmd.fd
+
+	(1)  LP49[/]; unmount  /y
+	
+	(2) Setup a new FDD on VMware
+
+	  (a) Click the VMware <VM> tab 
+	  (b) Select the <Setting> option.
+	  (c) Select the <Floppy> from the Device list
+	  (d) In the Connection field, setup the next floppy. 
+		ex.
+		- Use a floppy image
+		[ /home/maruyama/LP49/lp49-cmd.fd ]
+	  (e)  Click Save button.
+
+	(3)  LP49[/]; mount -ac /srv/dos  /t /dev/fd0disk
+
+
+
++--------------------------------------------------------+
+|      HDD and   DOS/EXT2 service                        |
++--------------------------------------------------------+
+  [1] Partition 
+
+        * Partition table in MBR (cf. PC architecture) is used.
+
+	* DOS file system and EXT2 file syatem are supported.
+
+	* Partions are named in this way:
+	    dos-0, dos-1,,, 
+	    ext2-0, ext2-1,,,
+
+	* Each partition is identifiled as follows:
+	    /dev/sdC0/dos-0
+	    /dev/sdC0/ext-0
+	    ....
+
+
+  [2]  EXT2SRV :  Ext2 file system
+
+        --------- commands -----------------------------------------
+	LP49[/]:  bind -a #S /dev                             --- (a)
+	LP49[/]:  spawn  /t/b/ext2srv                         --- (b) 
+	LP49[/]:  mount -c /srv/ext2 /work /dev/sdC0/ext2-0   --- (c)
+	LP49[/]:  cd /work                                    --- (d) 
+	-------------------------------------------------------------
+
+	(a) Bind HDD onto /dev.
+	(b) Start the ext2 file server. 
+	    This service is registered as "/srv/ext2".
+	(c) Mount the "ext2-0" partion onto "/work" 
+
+
+  [3] DOSSRV :  DOS file system
+
+        --------- commands -----------------------------------------
+	LP49[/]:  bind -a #S /dev                            --- (a)
+	LP49[/]:  spawn /t/b/dos2                            --- (b)
+	LP49[/]:  mount -c /srv/dos /work  /dev/sdC0/dos-0   --- (c)
+	------------------------------------------------------------
+
+	(a) BIND HDD ont /dev.
+	(b) Start the DOS file server.
+	(c)  Mount the "dos-0" partion onto "/work"
+
+
+
++--------------------------------------------------------+
+|      USB memory and   DOS  service                     |
++--------------------------------------------------------+
+
+  LP49 currently support USB-1.0 
+
+===  Source files ===
+  + src/9/pc/devusb.c
+  + src/9/pc/usbuhci.c
+  + src/cmd/usb/usbd/*
+  + src/cmd/usb/usbsfs/*
+
+
+=== Related files ===========
+
+  + src/9/port/devmnt.c 
+     Esp.   mntattch()
+                --> mountrpc()
+  + src/9/port/chan.c 
+
+
+  [1] Bind USB memory device and mount 
+
+     ------ commands -----------------------------------------
+     LP49[/]:  bind  -a  #U  dev	
+ 
+     LP49[/]:  spawn  /t/b/usbd
+           --> "usbs" process is created.
+ 
+     LP49[/]:  spawn  /t/b/usbsfs
+           --> "usbsfs" server is created and mounted on "/ums"
+           -->  /ums/ctl,  /ums/raw,  /ums/data
+ 
+      LP49[/]:  spawn  /t/b/dos2  -f /ums/data:32  usbs
+           --> "dos2" server is created and srvname is posted as "/srv/dos2"
+ 
+      LP49[/]:  mount  -ac  /srv/usbs  /work
+           --> /work
+ 
+     LP49[/]:
+     --------------------------------------------------------
+
+
+  [Cf] Plan9 Manual on usbsfs
+      Usage: usb/usbsfs [-dD] [-m mountpoint] [ctrno id]
+
+      Usbsfs serves a directory named mountpoint (default /n/ums) containing
+      files ctl, data and raw which are analogous to other storage devices:
+        - data gives r/w access to blocks of the device
+        - ctl accepts one command ("reset"), and gives device geometry when read
+        - raw is a raw scsi-like interface (talk to it with scuzz)
+
+     It searches for a device with class=8, subclass=5 or 6, protocol=0x50, or
+     uses /dev/usb<ctrno>/<id> if specified.
+
+     You can format the storage any way you like, but the devices seem to come
+     pre-formatted with one FAT partition, which you can use like this:
+
+     term% usb/usbd
+     term% usb/usbsfs
+     term% disk/fdisk -p /n/ums/data
+     part dos 7 31559
+     term% dossrv -f /n/ums/data:7 usbstorage
+     dossrv: serving #s/usbstorage
+     term% mount /srv/usbstorage /n/d:
+     term% ls -l /n/d:
+     alrw-rw-rw- M 39 bill trog 180364 Oct  5 18:14 /n/d:/9LOAD
+     d-rwxrwxrwx M 39 bill trog      0 Nov 13 14:30 /n/d:/benedict
+
+     If there are several partitions, you can use fs(3) to manage them - it
+     seemed redundant to add partition handling to the usbfs driver itself.
+
+
+
+
+
+
+

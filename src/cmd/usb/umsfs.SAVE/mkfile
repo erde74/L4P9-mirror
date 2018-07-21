@@ -1,0 +1,18 @@
+</$objtype/mkfile
+
+TARG = umsfs
+
+HFILES = scsireq.h ../lib/usb.h
+OFILES = scsireq.$O umsfs.$O
+LIB=../lib/usb.a$O
+
+BIN=/$objtype/bin/usb
+
+</sys/src/cmd/mkone
+
+CFLAGS=-I../lib $CFLAGS
+
+$LIB:
+	cd ../lib
+	mk install
+	mk clean

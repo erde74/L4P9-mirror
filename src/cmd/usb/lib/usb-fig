@@ -1,0 +1,26 @@
+
+	
+Hub			Port			Device			Endpt
++---------------+  +--> +---------------+  +-->	+---------------+  +-->	+-------------+
+| pwrmode 	|  |	| removable	|  |	| _ref		|  |	| addr: 0..15 |
+| compount	|  |	| pwrctl	|  |	| ctlrno	|  |	| dir 	      |
+| pwrms		|  |	| * d	     ---|--+	| ctl		|  |	| type	      |
+| maxcurrent	|  |	| * hub		|	| setup		|  |	| isotype     |
+| nport		|  |	+===============+	| status	|  |	| id	      |
+| *port	     ---|--+	| removable	|	| id		|  |	| class	      |
+| isroot	|	| pwrctl	|	| class 	|  |	| csp	      |
+| portfd	|	| * d 		|	| npt		|  |	| maxpkt      |
+| ctlno		|	| * hub		|	| ls		|  |	| dev	      |
+| * dev0	|	+---------------+	| csp	 	|  |	| conf	      |
+| * d		|				| nif 		|  |	| iface	      |
++---------------+				| vid 		|  |	+-------------+
+						| uif 		|  |
+						| did		|  |
+						| *confug [0]	|  |
+						|	   :	|  |
+						|	  [15]	|  |
+						| * ep [0]      |  |	
+						|       :    ---|--+
+						|      [15]     |
+						+---------------+
+

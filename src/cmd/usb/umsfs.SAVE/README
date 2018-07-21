@@ -1,0 +1,34 @@
+Usage: usb/umsfs [-dD] [-m mountpoint] [-s srvname] [ctrlno id]
+
+Umsfs serves a directory named mountpoint (default /n/ums) containing
+the files ctl or n, where n is the number of the LUN you want to access.
+Shown are all LUNs the device says, that it serves and not that are
+used. In every LUN directory are the files data and raw. What they do
+is shown below:
+ - data gives r/w access to blocks of the device
+ - raw is a raw scsi-like interface (talk to it with scuzz)
+
+The root directory ctl file does accept the command "reset", which tells
+umsfs to reget the information about all LUNs and gives the device geo-
+metries when read.
+
+It searches for a device with class=8, subclass=5 or 6, protocol=0x50, or
+uses /dev/usb<ctrno>/<id> if specified.
+
+You can format the storage any way you like, but the devices seem to come
+pre-formatted with one FAT partition, which you can use like this:
+
+term% usb/usbd
+term% usb/umsfs
+term% disk/fdisk -p /n/ums/0/data
+part dos 7 31559
+term% dossrv -f /n/ums/0/data:7 usbstorage
+dossrv: serving #s/usbstorage
+term% mount /srv/usbstorage /n/d:
+term% ls -l /n/d:
+alrw-rw-rw- M 39 bill trog 180364 Oct  5 18:14 /n/d:/9LOAD
+d-rwxrwxrwx M 39 bill trog      0 Nov 13 14:30 /n/d:/benedict
+
+If there are several partitions, you can use fs(3) to manage them - it
+seemed redundant to add partition handling to the umsfs driver itself.
+

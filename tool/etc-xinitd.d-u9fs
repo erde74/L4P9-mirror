@@ -1,0 +1,17 @@
+# u9fs -- plan9
+
+service u9fs
+{
+	disable		= no
+	socket_type	= stream
+	protocol	= tcp
+	user		= root
+	wait		= no
+	user		= root
+	server		= /usr/local/etc/u9fs
+	server_args	= -Dz -a none -u maruyama /home/
+#	server_args	= /
+	groups		= yes
+	flags		= REUSE
+}         
+

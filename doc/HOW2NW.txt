@@ -1,0 +1,415 @@
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>         Networking in LP49                           <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+To try LP49 networking, you can use real machines, QEMU wmulator, 
+VMware or other VMs.
+
+**********************************************************
+*      Networking  on Real Machines                      *
+**********************************************************
+
+[1] Following ether cards are supported, currently.
+    
+    * AMD79c970 (Lance)    
+    * NE2000	
+    * Realtel 8139, 8168
+    * DEC2114
+    * Intel82557
+
+[2] LP49 decides the attached ether card by automatic probing.
+
+[3] To setup IP address and Gate way address, use ipsetup commands in QSH. 
+
+    LP49[/]: ipsetup <IPaddress>  <GatewayAddress>
+
+
+**********************************************************
+*      Networking setup  on QEMU using TUN/ATP  (080909) *
+**********************************************************
+
+[1]  General view
+    On the  Host OS, guest OS (LP49) NW appears as TUP interface.
+
+    +------------ Your Computer--------------------------+
+    |                            +----- HOST OS ------+  |
+    |  +--Guest OS on QEMU--+    |                    |  |
+    |  |                    |    |                    |  |
+    |  |     LP49           |    |     Linux          |  |
+    |  |                    |    |                    |  |
+    |  |                    |    |                    |  |
+    |  +--------+-----------+    |                    |  |
+    |           |                +---------|----------+  |
+    |           +--------------------------+             |
+    |   eth0 (10.0.0.2)           tun0 (Ex. 10.0.0.1)    |
+    +----------------------------------------------------+
+
+
+[2] Setting up on host OS side.
+
+(2-1) Load the Tun moduele:
+
+    ---------------------------------
+    # ls  -l  /dev/net/tun
+    # chmod  0660  /dev/net/tun
+    # chgrp   maruyama  /dev/net/tun
+    # modprobe  tun
+    ----------------------------------
+
+(2-2) Setup qemu-ifup "/etc/qemu-ifup" script:
+
+    ---------- /etc/qemu-ifup -------------
+    #!/bin/sh
+    sudo  /sbin/ifconfig  "$1"  10.0.0.1 
+    --------------------------------------
+
+(2-3) To allow qemu-ifup run, add following entry to "/etc/sudoers"
+     using "visudo" command.
+
+     ---------- /etc/sudoers -------------
+     maruyama    ALL=(ALL)  ALL
+     ------------------------------------
+
+[3]  Now, you can run LP49 using QEMU:
+
+     # sudo  qemu  -fda  /home/maruyama/LP49/lp49-bootfd-x2.fd  -net nic  -net tap
+     password:   <your-password>
+
+
+[4]  Setup IP-address and Gateway address on LP49/GuestOS using "ipsetup" command.
+
+      LP49[/] ipsetup <IPaddress>  <GatewayAddress> 
+      ---Ex.---------------------------------------
+      LP49[/] ipsetup  10.0.0.2  10.0.0.1
+      ----------------------------------------------
+
+      ---Ex.---------------------------------------
+      LP49[/] ipsetup 
+      ----------------------------------------------
+      If both addresses are omitted, 10.0.0.2 and 10.0.0.1 are set.
+
+
+*************************************************************
+*      Networking setup  on QEMU: Guest only NW (090116)    *
+*************************************************************
+
+[1]  General view
+    On the  Host OS, 2 guest OSes (LP49) run.
+
+    +------------ Your Computer--------------------------+
+    |                                                    |
+    |  +--Guest OS on QEMU--+    +--Guest OS on QEMU -+  |
+    |  |                    |    |                    |  |
+    |  |     LP49           |    |     LP49           |  |
+    |  |                    |    |                    |  |
+    |  |                    |    |                    |  |
+    |  +--------+-----------+    +---------+----------+  |
+    |           |                          |             |
+    |           +--------------------------+             |
+    |   eth0 (10.0.0.2)           tun0 (Ex. 10.0.0.3)    |
+    +----------------------------------------------------+
+
+[2] Setting up on host OS side.
+
+(2-1) Start QEMU for the 1st LP49.
+
+    ---------------------------------
+    # cd     LP49
+    # qemu -fda lp49-boot-x2.fd -std-vga -net nic -net socket,listen=localhost:1234
+    ----------------------------------
+
+(2-2) Start QEMU for the 2nd LP49.
+
+    ---------------------------------
+    # cd     LP49
+    # qemu -fda lp49-boot-x2.fd -std-vga -net nic,macaddr=52:54:00:12:34:57  -net socket,connect=localhost:1234
+    ----------------------------------
+
+(2-3) Setup the IP address of the 1st LP49
+
+      --Ex. ----------------------------------------
+      LP49[/] ipsetup  10.0.0.2  10.0.0.1
+      ----------------------------------------------
+(2-4) Setup the IP address of the 2nd LP49
+
+      --Ex. ----------------------------------------
+      LP49[/] ipsetup  10.0.0.3  10.0.0.1
+      ----------------------------------------------
+
+(2-5) Try ping fromthe 1st LP49 to the 2nd LP49.
+
+      --Ex. ----------------------------------------
+      LP49[/] cd  /t/b
+      LP49[/t/b] ping  10.0.0.2
+      ----------------------------------------------
+
+
+**********************************************************
+*         Network setup  on VMware                       *
+**********************************************************
+
+[1] Check the VMware-provided private network address.
+
+
+    [Linux] /sbin/ifconfig
+    lo        Link encap:Local Loopback
+              inet addr:127.0.0.1  Mask:255.0.0.0
+              .............
+
+    vmnet1    Link encap:Ethernet  HWaddr 00:50:56:C0:00:01
+              inet addr:192.168.74.1  Bcast:192.168.74.255  Mask:255.255.255.0
+              ........................
+
+    ==>  Private NW       192.168.74.0/24
+         Gateway address  192.168.74.1
+
+
+[2]  Setup IP-address and Gateway address on LP49/GuestOS.
+
+      LP49[/] ipsetup  <IPaddress>  <GatewayAddress>
+
+      --Ex. ----------------------------------------
+      LP49[/] ipsetup  192.168.74.2  192.168.74.1
+      ----------------------------------------------
+
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>         Server registray                             <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+*************************************************************
+*   Server registray                                        *
+*************************************************************
+
+
+   *  LP49 servers are merely user-mode process which can speak 9P protocol.
+
+   *  Client processes communicate with servers, exchanging 9P messages
+      through server channels (pipes or TCP connections).
+
+   *  Server channels are registerd on the "server registray".
+      "Server registray" is a 1 level file system named "/srv".
+
+      /srv/<servername>
+
+      ---- Ex. ----------------------------------
+      	   /srv/dos
+	   /srv/u9fs
+	   /srv/...
+      -----------------------------------------
+
+*************************************************************
+*   How to register services on server registray ?          *
+*************************************************************
+
+[1]  Services are registerd onto server registray (/srv) in several ways.
+    (1) A local server may register its pipe onto /srv at startup time.
+    (2) "srv" command may setup connection to the server, and register
+    	the TCP connection onto /srv.
+
+[2]  "/srv/<serveraname>"  denotes the connection to the server.
+
+[3] "mount" command mounts "/srv/<serveraname>" onto the mount point.
+
+    --- Ex -------------------------------------------------
+    LP49[/]: mount -a u9fs /mnt  
+    --------------------------------------------------------
+
+
+
+
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+<>            Typical  Servers                          <>
+<><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+
+*************************************************************
+*   U9FS:   mount Unix/Linux file systems on LP49         *
+*************************************************************
+
+<<< What >>>
+^^^^^^^^^^^^
+    Mount the Linux file tree onto the LP49 name space.
+
+
+<<< Example configuration using QEMU or VMware >>> 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    * Qume or VMware runs on the Linux.
+
+    * LP49 runs on  QEMU or VMware.
+
+    +-------------------Linux ----------------------------+
+    |                                                     |
+    | +------ LP49 --------+        Linux-file-tree       |
+    | |                    |                              |
+    | |           /dev/    |                              |
+    | |           /n ------|-------  /aa/                 |  
+    | |                    |             bb/              |
+    | |                    |                b1            |
+    | |    LP49            |                b2            |
+    | |                    |             cc/              |
+    | |                    |                c1            |
+    | |                    |             dd/              |
+    | +--------------------+                              |
+    +-----------------------------------------------------+
+
+
+<<< Linux-side setting (Host OS) >>>
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  On Linux, run the "u9fs" program. 
+
+
+  1. Install the executable file "u9fs" on "/usr/local/etc".
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     (located in LP49-yymmdd/src/cmd/unix/u9fs/u9fs) 
+
+     	[Linux]: cp LP49-yymmdd/src/cmd/unix/u9fs/u9fs /usr/local/etc
+  
+
+  2. Add the following line to the file "/etc/services".
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     u9fs      564/tcp
+
+
+  3. Preapare the file "u9fs" onto the "/etc/xinetd.d/" directory.
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     service u9fs
+     {
+       disable         = no
+       socket_type     = stream
+       protocol        = tcp
+       user            = root
+       wait            = no
+       user            = root
+       server          = /usr/local/etc/u9fs
+       server_args     = -Dz -a none -u maruyama /home/
+       groups          = yes
+       flags           = REUSE
+     }   
+  
+
+    Here, "server_args" mean:
+
+    -Dz : Debug data is put onto the log file "/tmp/u9fs.log". 
+    	    This file is truncated when u9fs starts.
+
+    -a none : No authentification.
+
+    -u <username>  ; /home/<username> 
+
+    /home/ :  File trees from /home/ are mounted.
+
+
+  4. Firewall setting on Linux
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     The port 564 (port number u9fs service) needs be opened. 
+
+    ( I had some troubles to set this firewall hole.)
+
+   
+  5.  Restart xinetd 
+  ^^^^^^^^^^^^^^^^^^
+
+      % /etc/init.d/xinetd  restart
+     
+
+
+<< LP49 side >>
+^^^^^^^^^^^^^^^^
+    "srv" program is used.
+    "srv" binary is placed on the  /b/srv directory of the boot floppy image.
+
+   1. Start LP49 
+   ^^^^^^^^^^^^^
+
+   2. Setup the IP-address and Gateway-address.
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+       LP49[/]; ipsetup  <IPaddress>  <GateWayAddress>
+
+       Ex.  ipsetup 10.0.0.2  10.0.0.1
+     
+
+   3. create the srv process (located in /t/b/arv).
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+       LP49[/]; spawn /t/b/srv tcp!10.0.0.1  u9fs
+     
+       - A srv process is created, a TCP-connection is established to 
+         the u9fs server on the target machine,
+	 and the connection is registerd as /srv/u9fs.
+
+
+   4. Mount the service
+   ^^^^^^^^^^^^^^^^^^^^
+       LP49[/]; mount -a /srv/u9fs  /n
+       LP49[/]: cd  /n
+       LP49[/n]: ls
+     
+
+   5. Enjoy with mounted files 
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+   5. Unmount the service
+  ^^^^^^^^^^^^^^^^^^^^^^^^
+      LP49[/n]; cd /
+      LP49[/]: unmount  /n
+
+
+
+
+
+*************************************************************
+*     EXPORTFS/IMPORT:                                      *
+*************************************************************
+
+
+<< EXPORT  side >>
+^^^^^^^^^^^^^^^^
+   1. Start LP49 on QEMU
+   ^^^^^^^^^^^^^^^^^^^^^
+      # cd LP49
+      # qemu -fda lp49-boot-x2.fd -std-vga -net nic -net socket,listen=localhost:1234
+
+   2. Setup the IP-address and Gateway-address.
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+       LP49[/]; ipsetup  [<IPaddress>  [<GateWayAddress>]]
+
+       Ex.  ipsetup
+       Ex.  ipsetup 10.0.0.2  10.0.0.1
+     
+
+   3. start listening
+   ^^^^^^^^^^^^^^^^^^
+
+       LP49[/]; cd t/b
+       LP49[/t/b]: listen1 tcp!*!55 /t/b/exportfs &
+
+
+
+<< INPORT  side >>
+^^^^^^^^^^^^^^^^
+   1. Start LP49 on QEMU
+   ^^^^^^^^^^^^^^^^^^^^^
+      # cd LP49
+      # qemu -fda lp49-boot-x2.fd -std-vga  -net nic,macaddr=52:54:00:12:34:57  -net socket,connect=localhost:1234
+
+
+   2. Setup the IP-address and Gateway-address.
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+       LP49[/]; ipsetup  <IPaddress>  [<GateWayAddress>]
+
+       Ex.  ipsetup 10.0.0.5  
+     
+
+   3. import 
+   ^^^^^^^^^^
+
+       LP49[/]; cd t/b
+       LP49[/t/b]: import -a 10.0.0.2 / /work
+
+
+
+
+
+

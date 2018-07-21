@@ -1,0 +1,6 @@
+<><> EXT2 File server <><>
+
+(1) Thread 
+   L4 thread should be used insted of Plan9 thread.	
+
+(2) _ref.c  : dummy definition of   incref(), decref()  in libthread

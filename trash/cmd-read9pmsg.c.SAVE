@@ -1,0 +1,74 @@
+//%%%
+
+#include <u.h>
+#include <libc.h>
+#include <fcall.h>
+
+//%------------------------
+#include  <l4all.h>
+#include  <l4/l4io.h>
+#define   _DBGFLG  0
+#include  <l4/_dbgpr.h>
+//%--------------------------
+
+
+#define  PR   l4printf_g
+static void dump_mem(char *ss, unsigned char *start, unsigned size)
+{
+  int  i;
+  unsigned char c;
+  PR(" %s ", ss);
+  for(i=0; i<size; i++) {
+    if ( i>0 && i%16 == 0) PR("\n");
+    c = start[i];
+    if ( c >= ' ' && c < '~')
+      PR("%.2x:%c", c, c);
+    else
+      PR("%.2x", c);
+  }
+  PR("\n");
+}
+
+
+
+int
+read9pmsg(int fd, void *abuf, uint n)
+{
+	int m, len;
+	uchar *buf;
+
+	DBGPRN("> %s(%d abuf=%x n=%d)\n", __FUNCTION__, fd, abuf, n);
+
+	buf = abuf;
+
+	/* read count */
+	m = readn(fd, buf, BIT32SZ);
+	// dump_mem("read9p-1:", buf, BIT32SZ); ///////
+
+	if(m != BIT32SZ){
+	        if(m < 0) {   DBGPRN("< %s()A-> -1 \n", __FUNCTION__); 
+			return -1;
+		}
+		DBGPRN("< %s()B-> 0 \n", __FUNCTION__); 
+		return 0;
+	}
+
+	len = GBIT32(buf);
+	if(len <= BIT32SZ || len > n){
+	        l4printf /*werrstr*/("read9pmsg: bad length in 9P2000 message header");
+		DBGPRN("< %s()C-> -1 ;; len=%d n=%d \n", __FUNCTION__, len, n); 
+		return -1;
+	}
+
+	len -= BIT32SZ;
+	m = readn(fd, buf+BIT32SZ, len);
+	// dump_mem("read9p-2:", buf+BIT32SZ, (len < 16)?len:16); ////
+
+	if(m < len) {   
+	        DBGPRN("< %s()D-> 0  m=%d < len=%d\n", __FUNCTION__, m, len); 
+		return 0;
+	}
+
+	DBGPRN("< %s()E-> %d \n", __FUNCTION__,  BIT32SZ+m); 
+	return BIT32SZ+m;
+}

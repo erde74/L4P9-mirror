@@ -1,0 +1,179 @@
+This is pTeX, Version 3.141592-p3.1.10 (utf8.euc) (Web2C 7.5.4) (format=platex 2009.4.6)  16 JUN 2009 15:28
+**lp49
+(./lp49.tex
+pLaTeX2e <2006/11/10>+0 (based on LaTeX2e <2003/12/01> patch level 0)
+(./ipsjpapers.cls
+Document Class: ipsjpapers 2008/12/29 ver 3.01
+(./ipsjpapers.sty
+\old@latex@skip=\skip41
+\@Q=\dimen118
+ (./ipsjdrafts.sty
+\jfsize=\count81
+\jspaceskip=\dimen119
+\@mojihaba=\dimen120
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <12> on input line 135.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <8> on input line 135.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <6> on input line 135.
+\@abstractbox=\box41
+\@eabstractbox=\box42
+\c@volpageoffset=\count82
+\c@volume=\count83
+\c@number=\count84
+\c@year=\count85
+ (./ipsjcommon.sty
+\c@section=\count86
+\c@subsection=\count87
+\c@subsubsection=\count88
+\c@paragraph=\count89
+\c@subparagraph=\count90
+\bib@adjustheight=\dimen121
+\c@figure=\count91
+\c@table=\count92
+\cap@linewidth=\dimen122
+\cap@hsize=\dimen123
+\cap@prevgraf=\count93
+\cap@box=\box43
+\PF@fnotectr=\count94
+\PF@page=\count95
+\adj@boxa=\box44
+\adj@boxb=\box45
+\adj@height=\dimen124
+\adj@deadcycle=\count96
+)
+\ack@box=\box46
+)))
+(/usr/local/teTeX/share/texmf-dist/tex/generic/epsf/epsf.tex
+This is `epsf.tex' v2.7k <10 July 1997>
+\epsffilein=\read1
+\epsfframemargin=\dimen125
+\epsfframethickness=\dimen126
+\epsfrsize=\dimen127
+\epsftmp=\dimen128
+\epsftsize=\dimen129
+\epsfxsize=\dimen130
+\epsfysize=\dimen131
+\pspoints=\dimen132
+\epsfnoopenhelp=\toks15
+) (./comment.sty) (./mediabb.sty
+Package: mediabb 2006/10/26 v1.9 iNOUE Koich! <inoue@ma.ns.musashi-tech.ac.jp>
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/graphicx.sty
+Package: graphicx 1999/02/16 v1.0f Enhanced LaTeX Graphics (DPC,SPQR)
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 1999/03/16 v1.13 key=value parser (DPC)
+\KV@toks@=\toks16
+)
+(/usr/local/teTeX/share/texmf/tex/latex/graphics/dvipdfmx-contrib-latex/graphic
+s.sty
+Package: graphics 2001/07/07 v1.0n Standard LaTeX Graphics (DPC,SPQR)
+ (/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/trig.sty
+Package: trig 1999/03/16 v1.09 sin cos tan (DPC)
+)
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/graphics.cfg
+File: graphics.cfg 2005/02/03 v1.3 graphics configuration of teTeX/TeXLive
+)
+Package graphics Info: Driver file: dvipdfm.def on input line 81.
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/dvipdfm/dvipdfm.def
+File: dvipdfm.def 1999/9/6 vx.x Driver-dependant file
+))
+\Gin@req@height=\dimen133
+\Gin@req@width=\dimen134
+))
+(./lp49.aux
+
+LaTeX Warning: Label `L4' multiply defined.
+
+)
+\openout1 = `lp49.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for JY1/mc/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for JT1/mc/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <20.74> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 87.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <20.74> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 87.
+ [1]
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <12> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 87.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <12> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 87.
+ [1]
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <14.4> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 92.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <14.4> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 92.
+
+Overfull \hbox (1.4692pt too wide) in paragraph at lines 120--121
+[]\JY1/mc/m/n/12 組み込みシステムに必要な機能をも っ
+ []
+
+[1] [2] [3] [4] [5]
+Overfull \hbox (24.42218pt too wide) in paragraph at lines 418--424
+[]\OT1/cmr/m/n/12 APL \JY1/mc/m/n/12 のシステムコ ールは\OT1/cmr/m/n/12 , \JY1/
+mc/m/n/12 使い慣れた関数呼び出し \OT1/cmr/m/n/12 (open(...), read(...), write(.
+..),,,)
+ []
+
+[6] [7] [8] [9]
+Overfull \hbox (15.86952pt too wide) in paragraph at lines 619--620
+ [] 
+ []
+
+[10] [11]
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <7> on input line 680.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <5> on input line 680.
+ [12] [13] [14]
+Overfull \hbox (49.31264pt too wide) in paragraph at lines 875--877
+[]\OT1/cmr/m/n/12 LP49 \JY1/mc/m/n/12 の詳細な資料とソ ースコ ードは 、 \OT1/cm
+r/m/n/12 WEB \JY1/mc/m/n/12 サイト \OT1/cmr/m/n/12 http://research.nii.ac.jp/H2
+O/LP49
+ []
+
+[15]
+
+LaTeX Font Warning: Font shape `JT1/gt/m/it' undefined
+(Font)              using `JT1/gt/m/n' instead on input line 938.
+
+
+LaTeX Font Warning: Font shape `JY1/gt/m/it' undefined
+(Font)              using `JY1/gt/m/n' instead on input line 938.
+
+[16] [17] (./lp49.aux)
+
+LaTeX Font Warning: Some font shapes were not available, defaults substituted.
+
+
+LaTeX Warning: There were multiply-defined labels.
+
+ ) 
+Here is how much of TeX's memory you used:
+ 1040 strings out of 95542
+ 12428 string characters out of 1190447
+ 63368 words of memory out of 1500000
+ 4214 multiletter control sequences out of 10000+50000
+ 15863 words of font info for 63 fonts, out of 1200000 for 2000
+ 14 hyphenation exceptions out of 8191
+ 32i,7n,23p,298b,484s stack positions out of 5000i,500n,6000p,200000b,5000s
+
+Output written on lp49.dvi (19 pages, 48584 bytes).

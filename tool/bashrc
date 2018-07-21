@@ -1,0 +1,18 @@
+# .bashrc
+                                                                                                                            
+# User specific aliases and functions
+                                                                                                                            
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+                                                                                                                            
+alias mntfd='losetup /dev/loop1 /home/maruyama/LP49/lp49-boot.fd ; mount /dev/loop1 /mnt/floppy; ls /mnt/floppy'
+alias umntfd='umount /mnt/floppy; losetup -d /dev/loop1; echo UMNT-FD'
+                                                                                                                            
+alias x2mntfd='losetup /dev/loop1 /home/maruyama/LP49/lp49-boot-x2.fd ; mount /dev/loop1 /mnt/floppy; ls /mnt/floppy'
+alias umntfd='umount /mnt/floppy; losetup -d /dev/loop1; echo UMNT-FD'
+                                                                                                                            
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+        . /etc/bashrc
+fi

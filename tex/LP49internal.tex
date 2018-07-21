@@ -1,0 +1,3397 @@
+\documentstyle{jreport}
+%\documentstyle[11pt]{jarticle}
+% \documentstyle[twocolumn]{jarticle}
+\input epsf
+\input comment.sty
+
+\topmargin = 0cm
+\oddsidemargin = 0cm
+\evensidemargin = 0cm
+\textheight = 24cm
+\textwidth = 17cm
+
+\setcounter{secnumdepth}{2}
+
+%-----------------------------
+\begin{document}
+
+\title{\huge\bf
+LP49の内部構造
+}
+
+\author{$H_2O$}
+
+% \eauthor{
+%  Katsumi Maruyama, Kazuya Hidaka, Soichiro Hidaka, Hirotatsu Hashizume, 
+% }
+
+% \affiliation{国立情報学研究所   National Institute of Informatics}
+
+\maketitle
+
+
+\tableofcontents
+%%%%%%%%%%%%%%%%%%%%%%%
+\part{LP49の概要}
+
+\chapter{LP49開発の目的}
+   
+    OSはソフトウェアシステムのベースであり、その適不適はシステムの性能
+    (機能・効率・信頼性)ばかりでなく、システムの開発コスト(開発期間・拡張性
+    など)を大幅に左右する。組込みシステムを始めとする制御システムやサーバ
+    システムは、 
+     適用分野ごとに要求条件が異なる、 
+     高い信頼性が要求される、 
+     多様なプログラムの短期間開発が要求される、 
+    などの要求のために、いわゆる汎用OSでは不十分である。
+
+      また、OS技術はソフトウェア技術の根幹であり重要な研究テーマである。
+    しかし、汎用OSの世界は既存プログラムの活用が第一優先されるので、
+    新規OSを開発しても世間に受け入れられない。
+    このためにかつては唯一IBM を追従しえた日本の大手ベンダーも、
+    OSの研究開発からは手を引いてしまった。
+    ところが、組込みシステム用OSの場合は、前記要求に答えられれば
+    既存APIから脱却することが可能である。
+
+      一般に技術革新は専用解から生まれ、それが一般化されて汎用解として普及していく。
+      制御システム・サーバ用OSは、この意味からも基盤ソフトウェア技術の優れた
+      研究ターゲットである。また、ソフトウェア技術は、優れた研究成果を踏み台として、
+      かつ文献資料だけではなくソースコードを通して進歩してきた。
+      本試作システムは、L4 マイクロカーネル (独 Karlsruhe大学) と
+      Plan9 (米Bell研) に敬意を表して LP49 と呼んでいる。
+
+
+\vspace{1cm}
+% \chapter{LP49開発の目的}
+
+      本研究は、以下の目的をもって行っている。
+
+\begin{description}    
+\item[制御システム(組込みシステム) やサーバに適したシンプルなＯＳ]
+      汎用OSは巨大化・複雑化しているが (Ex. Windows-vista: 5000万行、Redhat 7.1 Linux: 3000万行)、
+      制御システムやサーバに必要な機能は、その極一部でしかない。
+      制御用、サーバ用に必要充分な機能をもったコンパクトなOSの意義は高い。
+    
+\item[障害に対する頑強性の強化 → マイクロカーネル＋マルチサーバ構成]
+    例えば電話交換システムは無停止運転が要求され、許容停止時間を20年間に1時間である。
+    このように、高い信頼性が要求される。
+    現在使われている大部分のOSはモノリシック型であるが、モノリシックOSでは、
+    部分障害 (例えばドライバのバグ) でもシステムクラッシュを導きがちである。
+     障害が生じても、波及範囲を閉じ込めて部分再開を可能とするためには、
+    マイクロカーネル＋マルチサーバ構成の OSが有利であるが, 
+    まだその技術が確立されたとはいえない。本研究では、以下の技術の確立を狙う。
+  \begin{itemize}
+  \item マイクロカーネル以外は、全てユーザモード（プロセッサの非特権命令）で実行させる。
+
+  \item  名前空間管理、ファイルサービスなどのいわゆるOSサービスは、
+        個別のユーザモードプロセスとして実現し、個別再開を可能とする。
+
+  \item  デバイスドライバ (OSクラッシュの原因の7割はドライバと言われる)も、
+        ユーザモードで動作させる。
+  \end{itemize}
+    
+\item[拡張性の強化]
+      組込み系を始めとする制御システムは適用分野毎に要求機能が異なるので、
+    要求に応じて機能の拡張や余分機能の削減を用意に実現できることが望まれる。
+    本研究では、機能追加は、ユーザモードプロセスの追加などにて、容易に
+    行えるようにする。
+    
+
+\item[システム連携の機能]
+      例えば自動車では数十台のCPUが、連携しながら動作している。
+今後の組込みシステムは、益々多様な連携動作が要求される。
+この連携の仕組みこそが、これからの勝負所である。
+従来から、分散処理は基盤ソフトウェアの重要な課題で多面的に研究されてきたが、
+現在実用化されているものはまだまだ融通性や機能が不十分である。
+OSが提供する分散処理で普及しているきものは、分散ファイルシステム 
+(例えば、 NFS ファイルシステム、Andrew ファイルシステム) 位である。
+また、分散処理ミドルウェアの CORBA は、仕様が巨大化して使いにくく、
+融通性が不十分である。JAVA-RMI も、リモートプロシージャコールが出来るだけである。 
+
+      これからの連携処理機能としては、分散リソースの体系的な管理、
+      一纏まりの関連リソースのexport/import、環境変数を含む動作環境の連携、
+      群処理など、従来の分散OSからは飛躍した機能が要求されよう。
+
+      UNIXの次にくるOSとしてBell研で研究開発されたOS Plan9 は、新しい視点を提示しており、
+      制御システム用連携処理としても、大いに参考になる。
+
+
+\item[プログラム開発の容易化]
+      現在までの大部分の制御プログラムや組込みプログラムは、性能を上げるため、
+      並びにハードウェア制御などを行うために、カーネルモードプログラムであった。
+      カーネルモードプログラムは、記述に高いスキルやノウハウが必要なうえ、デバッグが大変難しい。
+    その上,プログラムバグがあると、システム全体がクラッシュしがちである。
+      本研究では、マイクロカーネル以外は全てユーザモードプログラムとし、
+      ほとんどのサービス機能はユーザモードプロセスの追加で実現でき、
+      デバインスドライバもユーザモード化する。
+    これにより、大幅にプログラム開発が容易化・効率化される。
+    
+\item[実時間性能の維持]
+      汎用OSにおいてモノリシック構成が主流なのは、マイクロカーネル型OSに比して
+      効率が良かったからである。
+      モノリシックOSのシステムコールはトラップで実装できるのに対し、
+      マイクロカーネル構成のそれはメッセージ通信となる。
+      トラップの方がメッセージ通信よりも高速だからである。
+      しかし、最近のマイクロカーネル技術の進歩により、その差異は縮まっている。
+      本研究で採用している L4 マイクロカーネルは、大変に高速である。
+      その上、プロセッサ性能が非常に向上してきている。
+      システムの総合的オーバヘッドがモノリシック型に比べて 1割以下ならば、マイク
+    ロカーネル型の頑強性・拡張性とプログラム開発の容易化の利点が活きる。
+    
+
+\item[遠くを見るための巨人の肩   → L4マイクロカーネルと Plan9 OSのソースの活用]  
+      OS全体をスクラッチから作るには、膨大の工数を要する。
+多くのOS研究が研究カーネルを作った段階で息切れしてしまっている。
+そこでできる限りL4マイクロカーネルと Plan9 のソースコードを活用することとした。
+ドイツKarlsruhe大学の L4 マイクロカーネルは、
+          本研究がカーネルに要求する機能をほぼ揃えている、
+          性能が非常に優れている、コンパクトである、 
+          オープンソースであるといった特長をもつ。
+
+    また、Bell研で研究開発された Plan9 は、
+    融通性の高い分散処理を実現、
+    適切なコンポーネント化という特長を持っている。
+    また、幸いなことに現在はオープンソースコードになっている。
+    
+\item[ソースコードの公開]
+      ソフトウェアの研究には、ソースコードの公開が有効である。
+      コンパクトで自在に修正などが可能な組込み用OSを提供する。
+      OS を学習したり、手直ししてみたい人にコンパクトなソースを提供する。
+      GNU環境にて Plan9 流プログラムの開発を経験できる。
+\end{description}
+
+
+\chapter{プログラム構成}
+
+      LP49 のプログラム構成を図 \ref{fig:LP49general} に示す。ソースコードは、
+      WEBサイト http://research.nii.ac.jp/H2O/LP49  にて公開している。
+
+\begin{figure}[hbt]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/LP49general.eps}
+    \caption{LP49全体構成}
+    \label{fig:LP49general}
+  \end{center}
+\end{figure}
+
+
+
+      LP49は、以下の階層からできている。
+\begin{description}
+\item[マイクロカーネル階層  (カーネルモード)]
+       L4 マイクロカーネルそのものであり、ここだけがカーネルモードで動作している。
+       マルチスレッド、タスク(=プロセス)論理空間、スレッド間通信、ページマップの
+       諸機能を提供している。
+    
+\item[HVM 階層 (ユーザモードプロセス)]
+      これはユーザモードで走る特別タスク(L4が管理するプロセス）である。
+      LP49 の各プロセスの立ち上げ、スレッド制御と論理空間制御、
+    並びにページャースレッド ({\tt Pager}) の機能を持っている。
+    (L4マイクロカーネルでは、安全性を上げるために 
+    \verb$L4_ThreadControl()$ と \verb$L4_SpaceControl()$は、
+    L4が最初に生成したプロセスにだけ許されている。)
+
+
+    ここに {\tt Pager} は、スレッド実行中にページフォールトが生ずると起動され、
+    ページ割り付けを行うユーザモードのスレッドである。各スレッドは、生成時
+    に{\tt Pager}を指定しておく。
+    スレッドの実行中にページフォールトが生ずると、L4マイクロカーネルは登録されたPager
+    スレッドに Page Fault message を送る。
+    そこで{\tt Pager}は、適切なページを割り当てる。
+
+    {\tt Pager}をユーザが記述でき、
+    またPageのネストもできるので、フレキシブルなメモリ管理を行うことができる。
+
+    HVMは、将来 Hypervisor Monitor 階層として Virtual Machine に発展させることを
+    考えて付けた名前であるが、現時点ではその機能は持っていない。
+    
+\item[CORE階層/COREタスク  (ユーザモードププロセス)]
+      Plan9 のカーネル相当の機能を提供している、
+      ユーザレベルプロセスである。
+      つまり、プロセッサの非特権モードで走るので、安全性が高い。
+     システムコール (実際にはメッセージ) を受けて、所望の処理を行う。
+     デバイスドライバもここに含まれる。
+
+     (将来的には、複数のユーザレベルプロセスに分割する可能性がある)
+
+    
+\item[サービス階層 (ユーザモードプロセス)]
+       OSサービスを行うファイルサーバー類も普通の応用プログラムも、
+     同等のユーザモードプロセスである。
+    ファイルサーバは、後述の様に 9P プロトコルを喋れる点がちがうだけである。 
+\end{description}
+
+
+
+%%%%%
+\chapter{サービスと抽象ファイル}
+
+\section{サービス部品：　サーバントとサーバ}
+      LP49 が提供するサービスには、 DOSファイルサービス、 EXT2ファイルサービスのような
+      （どちらかというと）高位サービルと、ハードウェアデバイス制御、リソース制御、
+      環境変数記憶、サービス記録簿といった低位サービスとがある。
+      LP49 では、前者は独立したプロセスによって提供され、
+      後者は CORE 層内のプログラムによって提供される。
+      両者を識別する名前があったほうが便利なので、ここでは前者を「サーバ」、
+      後者を「サーバント」と呼ぶことにする。
+
+      サーバもサーバントも、内部要素にアクセスするための「部分名前空間」
+      （directryr tree)を持っており、クライアントはそれを自分の名前空間に
+        マウントすることにより、普通のファイルインタフェースで目的要素にアクセス
+    して、内容の読み書き・制御を行える。
+
+    
+ {\bf\flushleft (1)サーバント}
+
+     サーバントはハードウェアデバイスなど低位サービスを提供するための機能であり、
+     Plan9 のカーネルデバイスファイルシステム (Kernel device file systems)に相当する。
+     但し、対象がハードウェアデバイスだけではなく、
+     サーバ登録簿、環境変数記憶、プロトコルスタックなどを含むので
+    「サーバント」と呼んでいる。
+
+      サーバントは、CORE階層内に存在し、ローカルプロシージャコール
+      される。
+      (将来はスレッドを持たせてメッセージインタフェースにするかもしれない。）
+
+      サーバントプログラムを識別するための名前として
+      『\verb|'#'+英字|』の形式の名前を持つ。
+    以下に代表的なサーバントとその名前を示す。
+
+{\small
+\begin{verbatim}
+      #c  コンソール
+      #M  サーバマウントプログラム
+      #S  ハードディスク
+      #f  フロッピーデバイス
+      #e  環境変数 (env)
+      #s  サービス記録簿 (service registry)
+      #l (小文字エル)  Ether ドライバ
+      #I (大文字アイ)  プロトコルスタック
+      #| (縦バー)    Pipe
+      #R  Rootファイルシステム  (Plan9 の #R とは異なる)
+      #U  USBホストコントローラ
+      #v  VGAコントローラ
+      ...
+\end{verbatim}
+}
+
+
+{\bf\flushleft (2) サーバ}
+
+    DOSファイルシステム, EXT2ファイルシステムなど高位サービスを提供するサーバであり、
+    各サービスごとに独立したユーザモードのプロセスである。
+    クライアントプロセスとは、9Pプロトコルを使って会話する。
+    つまりメッセージインタフェースである。
+    つまりサーバとは、9Pプロトコルを喋れるユーザプログラムにすぎない。
+    9Pメッセージは、サーバリンクと呼ばれる TCP接続あるいは pipe を通して運ばれる。
+   各サービスのサーバリンクはサービス``記録簿 {\tt (/srv/*)}'' に登録される。
+   クライアントは、サーバ登録簿から目的のサーバを見つけて、
+   これを自分の名前空間にマウントすることで、サーバの持つ名前空間に
+   普通のファイルインタフェースでアクセスできるようになる。
+
+   同一のサービスをサーバとして実装することも、
+   サーバントとして実装することも可能である。
+   プログラムを作る際の参考に、RAMファイルサービスについて、
+   サーバによる実装を {\tt src/9/cmd/simple/ramfs.c}、
+   サーバントとしての実装を {\tt src/9/port/devrootfs.c} として載せてある。 
+
+
+\section{抽象ファイルオブジェクト}
+
+LP49/Plan9 では、ほとんど全てのリソース（実ファイルからネットワーク接続まで）を
+``抽象ファイル''として扱っている。
+つまり、{\tt create(), open(), write(), read(), stat() ,,,}により、
+統一的に操作できる。
+
+
+○　サーバント、サーバに収容されている。\\
+
+○　オブジェクト \\
+
+○  (To be described.) \\
+
+\vspace{4cm}
+
+
+\section{サーバント、サーバの名前空間の接続}
+
+   サーバントもサーバも自分の名前空間(directory tree)を有しており、
+抽象ファイル（リソース）を収容している。
+
+   サーバントやサーバの名前空間を、
+ユーザプロセスの名前空間に接続 ({\tt bind, mount}) することで、
+ユーザプロセスから使えるようになる。
+ {\tt bind} する際にアクセス権限チェックを行う(未実装)。
+
+{\small
+\begin{verbatim}
+  【サーバントの名前空間への接続例】
+     Ex.   bind -a #f  /dev    
+               ← フロッピーが /dev/fd0disk, /dev/fd0ctl として見える
+           bind -a #S  /dev    
+                ←ハードディスクが /dev/sdC0/...として見える
+           bind -a #l  /net    
+                ← プロトコルスタックインタフェースが/net の下に見える。
+\end{verbatim}
+}
+
+
+
+
+%%%%%
+\chapter{Plan9 と LP49 の主要な対比}
+
+\begin{table}[htb]
+\caption[Plan9vsLP40]{LP49とPlan9の対比 }
+\label{table:LP49-Plan9}
+\begin{center}
+{\footnotesize 
+\begin{tabular}{|l|l|l|}
+\hline
+ 分類  & Plan 9 & LP49 \\
+\hline
+
+Micro kernel  &     No        &   Yes   \\
+\hline
+
+並行処理  &  プロセスはコルーチン、 &   L4 Process  \\
+          &  スレッドはメモリ域共用のプロセス &  L4 Thread \\
+\hline
+
+システムコール    & Trap       &     L4 メッセージ \\
+                  & カーネル＋ユーザプロセス    & マルチスレッドサーバ \\
+\hline
+
+〃データ入力      & Plan9カーネルが   & L4ページマップ \\
+〃データ出力      & APL空間を直接アクセス          & L4 ページマップ \\
+\hline
+
+ドライバ     & カーネルモード    & ユーザモード  \\
+\hline
+
+言語仕様 &  Plan9独自のC                     &   GCC  　\\
+         &  無名フィールド, 無名パラメータ   & \\
+         &  typedef, USED(), SET()           &    \\
+         &   \#pragma, 自動ライブラリリンク  & \\
+\hline
+
+コンパイラ  &   Plan9 独自Cコンパイラ   &   GCC \\
+\hline
+
+ Utility  &  Plan9 の Linker, Assembler, mk    & GCC, gld, gmake \\
+\hline
+
+Binary    &  a.out形式         &    ELF形式 \\
+\hline
+
+\end{tabular}
+}
+\end{center}
+\end{table}
+
+
+
+   LP49の試作に当たっては、Plan9 のソースコードのうち有効利用できるものは活用したが、
+   事はそう簡単ではなく、かなりのパワーを要した。その主要な事項を以下に記す。
+    
+
+\begin{description}
+\item[コルーチンモデルとL4スレッドの違い]
+      並列処理の実現法が、Plan9はコルーチンモデルであるのに対し、
+      LP49はL4マルチスレッドモデルであるので、細部でいろいろと対処せざるを得なく、
+      相当量の修正が必要となった。
+    
+\item[言語仕様、開発環境の違い]
+      Plan9 の C言語はANSI-Cではなく、無名フィールド、無名パラメータなどの独自の
+      拡張を行った独特の Cである。
+    プログラム開発環境も Plan9 上の独自環境である。
+    我々は、L4マイクロカーネルをコンパイルでき、使い慣れたGNU 環境を使いたい。
+    そこで、GCC のフロントエンドを修正して Plan9 のC言語をサポートすることも考えたが、
+    GCCの頻繁な version up に追随するコストも考慮して、
+    Plan9のソースを人手で Plan9-C言語から GNU-C言語に変換する方を選んだ。
+    
+\item[システムコールの実装法]
+      Plan9のシステムコールは、モノリシックOSと同様なトラップで実現している。
+      つまり、ユーザモードのクライアントプロセス はトラップを起こして
+      カーネルモードに入り、カーネル内での処理待ち中断が比較的簡単に実現できる。
+
+    これに対し、LP49ではクライアントプロセスとサーバプロセスは
+    メッセージでやり取りする全く別のプロセスであり、
+    あるクライアントプロセスの仕事でサーバプロセスが待ち合わせると、
+    他のクライアントの要求を受け入れることができなくなってしまう。
+    この対処には、Minixのような特殊技巧 ( suspend-resume)を使ったり、マルチ
+    スレッドサーバとする必要がある。
+    LP49では、マルチスレッドサーバを実装した。
+    このための Plan9 ソースの修正は、かなりを要した。
+
+    
+\item[継ぎ足しプログラムの問題]
+      Plan9 カ−ネルプログラムの要であるチャネルコード(chan.c),デバイスコード(dev.c)などは、
+最初の版から継ぎ足しで拡張されてきたので、非常に分かりにくいプログラムになっている。
+学習用OSをも目指しているLP49にとってこれは問題で、
+いつか時間をとって書き直しをしたいと思っている。
+
+\item[簡明なプロトコルスタック]
+      プロトコルスタックは、Streamモジュール型 → X-kernel型 → 現在の queue接続型と、
+      3回にわたって全面的に作り直されているので、簡明なロジックになっている。
+      学習用OSとして使える。
+
+\item[グラフィックユーザインタフェース、VGA 周り]
+    これから着手。
+\end{description}
+
+
+
+
+%%%%%%%%%%%
+%\newpage
+\part{HVM階層}
+
+\chapter{LP49の立ち上げ}
+
+  HVM階層は（L4マイクロカーネルから見ると）ユーザモードプロセスであり、
+以下の機能を実現している。
+   (将来、CORE階層のプロセス管理機能は、HVMに移す可能性がある。)
+
+\begin{description} 
+
+\item[(1) LP49の立ち上げ]
+
+\item[(2) スレッドの生成、タスクの生成]
+      L4マイクロカーネルの \verb$L4_ThreadControl()$, \verb$L4_SpaceControl()$ を使って、
+    {\tt CORE層、QSH shell, dossrv}
+    の各プロセスを生成する。
+
+\item[(3) Pagerスレッド (ページャースレッド)  {\tt (src/9/pc/hvm/mx-pager.c)} ]
+      プログラムの実行中にページフォールトが生じると、
+      L4マイクロカーネルは本Pagerスレッドにpage fault メッセージを送る。
+      本Pagerスレッドは、適切なページを選択してpage faultしたアドレスに
+      マッピングする。
+      現{\tt Pager}は仮実装のためチェック機能が弱くプログラム構造も汚い。
+      ページャー実装は L4 マイクロカーネルの利用において
+      最も興味深い点の一つであるので、
+      将来全面的に作り直して以下を実現する予定である。
+      \begin{itemize}
+      \item  保護・セキュリティの強化
+      \item  Copy-on-write
+      \item  Page cache
+      \item  プロセス管理ページの分離
+      \end{itemize}
+
+\end{description}
+
+    
+%\chapter{LP49の立ち上げ}
+
+LP49 の立ち上げは、以下のように進む。
+
+{\bf\flushleft (1) Grub}
+
+  LP49のブートローダは　GNUの Grubである。
+ブートディスクの ``boot/grub/menu.lst''ファイルの内容を以下に示す。
+
+{\small
+\begin{verbatim}
+【Boot-CDの boot/grub/menu.lstファイルの内容】
+    #######
+    title = LP49: CD BOOT (Hvm + Pc + Init + DosSrv + 9660Srv)
+    kernel=/l4/kickstart-0804.gz
+    module=/l4/l4ka-0804.gz
+    module=/l4/sigma0-0804.gz
+    module=/boot/hvm.gz
+    module=/boot/pc.gz
+    module=/boot/init.gz
+    module=/boot/dossrv.gz
+    module=/bin/9660srv
+\end{verbatim}
+}
+
+この内容にしたがい、Grub は以下を行う。
+\begin{enumerate}
+\item  {\tt kernel} 及び {\tt module} にてて指定されたファイルを
+     ({\tt .gz}が付いている場合はunzipして)
+     順番に物理メモリにコピーする。
+
+\item  {\tt kernel}として指定された {\tt kickstart}の開始番地に
+  制御を渡して起動する。
+\end{enumerate}
+
+
+{\bf\flushleft (2) L4のkickstart}
+
+ {\tt kickstart}は、L4 マイクロカーネルの startup プログラムであり、
+GRUBによって物理メモリ上にコピーされたロードモジュールを用いて
+以下の処理を行う。
+
+\begin{enumerate}
+\item  L4マイクロカーネル本体 {\tt l4ka} を立ち上げる。
+
+\item  L4の元締め Pager {\tt sigma0} を立ち上げる。
+
+\item  LP49の {\tt hvm} モジュールを、L4マイクロカーネルのプロセスとして
+      立ち上げる。　
+
+\end{enumerate}
+
+
+{\bf\flushleft (3) LP49 のhvmの立ち上げ処理 }
+
+　　LP49の {\tt hvm}は、以下の順番でLP49 を立ち上げる。
+
+\begin{enumerate}
+\item  {\tt sigma0}からLP49が使用するメモリページをもらって
+  メモリ管理を初期設定する。
+
+\item  LP49 の Pager である mx-pager スレッドを生成・起動する。
+
+\item  GRUBがメモリー上にコピーしたロードモジューロを用いて、
+       以下の順に各プロセスを生成・起動する
+
+       \begin{description}
+       \item[pc]  LP49coreプロセス。
+       \item[init] {\tt Init}プロセス。シェルプロセスは、
+            ここから{\tt fork()}される。
+       \item[dossrv] DOSファイルはすぐにつかうので、
+           ここでDOSファイルサーバを立ち上げておく。
+       \item[9660srv]  CDのISOファイルサーバである。
+           すぐにCDを読む必要があるので、
+           ここで9660ファイルサーバを立ち上げておく。
+       \end{description}
+\end{enumerate}
+
+
+
+\begin{comment}
+\begin{enumerate}
+\item {\tt GRUB} は、ブートCDイメージの{\tt boot/grub/menu.lst} の内容に従って
+  L4の {\tt kickstart,  L4-kernal, l4-sigam0}, 
+   及び LP49の {\tt hvm, pc, qsh, dossrv} のロードモジュールを
+  メモリーにコピーした上で、L4の{\tt kickstart} を起動する。
+
+\item {\tt kickstart}は、{\tt L4-kernel}本体と、{\tt sigma0}を立ち上げ、
+  LP49の{\tt hvm}を起動する。
+
+\item  {\tt hvm}は、メモリ上のロードモジュールを用いて
+  {\tt pc, qsh, dossrv} を個別プロセスとして生成し、起動する。
+
+\item  {\tt hvm} は、{\tt pager}（ソースは {\tt src/9/hvm/mx-pager.c}) を生成する。
+
+\item  {\tt pager}スレッドは {\tt hvm}の要であり、
+  他プロセスからの要求メッセージを待ち、ページ割付、スレッド生成などを行う。
+\end{enumerate}
+\end{comment}
+
+
+
+%%%%%
+\chapter{Pager: ページフォルトの処理}
+
+      L4では、各スレッドは生成時にpagerを指定する。
+      スレッド実行中にページフォールトが生じると、指定された {\tt pager} に
+      page fault message を送る。
+      この際のpage faultの処理を行うのが本 {\tt pager} である。
+      ソースコードは、``\verb|src/9/hvm/mx-pager.c|である。
+
+      また、L4は安全のためにスレッドの生成やメモリ空間制御は L4 から
+      直接起動されたプロセスだけが行えるようにしている。
+      従って、スレッド生成とメモリ空間制御も {\tt pager} が担っている。 
+
+      {\tt Pager} は、他のプロセス内でページフォールとが生じたときに、
+      以下に述べる手順で各要求を処理する。
+
+\begin{enumerate}
+\item     {\tt L4-sigma0} から利用可能な全メモリページをもらい、
+         それらを {\tt hvm}の論理空間の ２Giga 番地以降に各メモリページを
+         『論理アドレス＝物理アドレス+２Giga』になるようにマップする。
+
+         (２Giga 番地以降へのフラットマッピングは仮手法であり、
+         将来作り直す予定。)
+
+\item   要求メッセージが来るのを待って、所定の処理を行う。ここに、要求メッセージとしては、ページフォールト、メモリ空間制御、スレッド制御などがある。
+\end{enumerate}    
+
+      現在のページャは実験用に短時間で書いたものであり、内容的に不十分であり、
+      プログラム構造も汚れている。
+      プロセスが使えるメモリ域のチェックも, ０ベージアクセスのチェックも行っていない。
+      同一プログラムプロセス間でのコードセグメントの共用も行っていないし、
+      コピーオンライトもまだ実装していない。
+      ページャは、今まで蓄積された経験に基づいて全面的に作り直す予定である。
+      L4 マイクロカーネルの利用において、ページャはもっとも工夫のしがいのある
+      面白い機能である。また、もっとも神経を使うプログラムでもある。 
+
+
+{\tt Pager}スレッドの処理概要を以下に示す。
+
+%%%%%%%%%%% mxpager-thread %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{\footnotesize
+\begin{verbatim}
+
+void mxpager_thread(void) 
+{
+    L4_ThreadId_t  src;
+    L4_Word_t      pfadrs, pf_page, ip;
+    L4_Fpage_t     fpage;
+    L4_MapItem_t   map;
+    L4_Msg_t       _MRs;
+    L4_MsgTag_t    tag;
+    :
+
+    tag = L4_Wait(& src);  // 最初のメッセージを受ける。
+    targettask = TID2PROCNR(src);
+
+    while (1) {
+        L4_MsgStore(tag, &_MRs);
+        label = L4_MsgLabel(&_MRs); 
+
+        if (label == THREAD_CONTROL)  { //スレッド制御要求の場合
+            :
+            rc = L4_ThreadControl(dest, space, sched, pager, utcbloc);
+            :
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        else if (label == SPACE_CONTROL)  { //論理空間制御要求の場合
+            :
+            rc = L4_SpaceControl(space, control, kipFpage, utcbFpage, redirector, &oldcntl);
+            :
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        else if (label == ASSOCIATE_INTR) { //割り込みハンドラ登録の場合
+            :
+            rc = L4_AssociateInterrupt(intrThread, intrHandler);
+            : 
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        else if (label == DEASSOCIATE_INTR)  {
+            :
+            rc = L4_DeassociateInterrupt(intrThread); 
+            :
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        else if (label == PROC2PROC_COPY) {
+            :
+            proc2proc_copy(fromproc, fromadrs, toproc, toadrs, size);
+            :
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        else if (label == PROC_MEMSET)   {
+            :	  
+            rc = proc_memset(procnr, adrs, value, size);
+            :
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        else if (label == MM_FORK)   {
+            :
+            rc = mm_fork(parent_tid, child_tid, th_max, pager, ip, sp);
+            :
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        //---------------------------------------------------------
+        else if (label == MM_FREESPACE)   {
+            :
+            rc = free_space(procnr);
+            :
+            tag = L4_ReplyWait(src,  &src);
+            continue;
+        }
+        else if (label == ALLOC_DMA)
+        {
+            略
+            continue;
+        }
+        else if (label == PHYS_MEM_ALLOC)
+        {
+            略
+            continue;
+        }
+        //============== Page fault ==============================
+        else {  // ページフォールトの場合はここにくる
+            :
+            pfadrs = L4_MsgWord(&_MRs, 0);  
+               //pfadrs: ページフォールトの番地
+            ip = L4_MsgWord(&_MRs, 1);      
+              //ip: 命令番地
+            client_task = TID2PROCNR(src);
+            pf_page = pfadrs & 0xFFFFF000;
+            targetpage = (unsigned)get_targetpage(client_task, pfadrs, ip);
+                // mapするための適切なページを求める
+            :
+            fpage = L4_Fpage(targetpage, 4096);
+            L4_Set_Rights(&fpage, L4_FullyAccessible);
+            map = L4_MapItem(fpage,  pf_page);  
+                 // map: ページマップ情報を編集 
+            L4_MsgClear(&_MRs);
+            L4_MsgAppendMapItem(&_MRs, map);
+            L4_MsgLoad(&_MRs);
+            tag = L4_ReplyWait(src,  &src); 
+                 // ReplyWait: 返答を返し、次のメッセージを待つ.
+                 //    返答時にページがマップされる.
+        }
+    }
+}
+\end{verbatim}
+}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  \newpage
+\part{CORE階層}
+
+%%%%
+\chapter{CORE層の基本機能}
+
+    ``LP49core''は、Plan9カーネル相当の機能を提供する"ユーザモード"で走る 
+L4 プロセスである。
+
+LP49core は、APLプロセスからシステムコールメッセージを受けて処理するので、
+この観点からはAPLプロセスがクライアント、LP49coreがサーバとして働く。
+サーバプロセスがは発行するシステムコールも同様である。
+また、LP49coreは 9Pメッセージをサーバプロセスに送って処理をいらいするので、
+この観点からは LP49coreがクライアント、サーバプロセスがサーバとして働く。
+
+
+\section{マルチスレッドサーバ}
+
+モノリシックOS (Plan9 も含めて）では、
+クライアントプロセスがシステムコールを実行すると、
+トラップが生じて、カーネルモードになり、
+カーネルがクライアント空間を直接アクセスできる。
+
+これに対し、
+LP49coreはユーザモードで実行されるL4のプロセスであり、
+クライアントプロセスとは独立した論理メモリ空間を持ち、
+システムコールはメッセージ通信によって実現される。
+
+そこで、LP49coreでは、マルチスレッドサーバを導入している。
+
+\begin{itemize}
+\item  クライアントからのシステムコール (L4メッセージで運ばれる)を受け付ける。
+\item  システムコールの処理中には、中断が生じうる。
+       中断が生じた場合には、別のクライアントプロセスのシステムコールを
+       受け入れるために、``マルチスレッドサーバー''としている。
+\item  このために、COREプロセスはシステムコールメッセージを受けとると、
+       スレッドプールから空きスレッドを取り出して、
+       そのスレッドに処理を任せる。
+\end{itemize}
+
+
+
+\section{ プロセス管理のシステムコール処理}
+
+プロセス管理のシステムコールとしては、{\tt fork(), spawn(), exec(), exits()} 
+等がある。ここに、{\tt spawn()}は {\tt fork()}と{\tt exec()}を合わせたものである。
+
+LP49のプロセスは、L4論理空間とL4スレッドから構築される。
+従って プロセス管理システムコールの要は、 
+L4 の \verb|L4_ThreadControl()| 及び\verb|L4_SpaceControl()| 実行である。
+
+現行（新版）の L4 は、security強化の観点から
+ \verb|L4_ThreadControl()| 及び\verb|L4_SpaceControl()|は
+L4が直接起動したプロセス、つまり{\tt HVM}の中で呼び出すことができない。
+そこで、{\tt CORE} は {\tt HVM}にプロセス管理要求メッセージを送り、
+{\tt  HVM}が L4 を呼び出すようにしている。
+
+
+\section{ ファイル系システムコール}
+
+Plan9/LP49では、ほとんど全てのリソースは``ファイル''として抽象化されている。
+（本資料の大部分では、``リソース'' と``抽象ファイルオブジェクト''とを
+同じ意味で使っている。）
+つまり、各リソースは``名前空間'' (Directory tree) からたどることが出来、
+{\tt create(), open(), read(), write(), close(), stat((), wstat()} 等の
+使い慣れたシステムコールで処理を行える。
+
+サーバントならびにサーバは、各々自分の名前空間を持っており、
+そこに各抽象ファイルオブジェクトがつながっている。
+
+
+\section{ 名前空間の管理}
+
+
+{\bf\flushleft (1) 名前空間の接続}
+
+  プロセスは、名前空間のdirectory tree をたどることで各リソースにアクセスできる。
+プロセスがアクセスできる名前空間を、``プロセスの名前空間'' と呼ぶことにする。
+
+  Unix同様に、名前空間のルートとなるのが``ルートファイルシステム''である。  
+ルートファイルシステムはサーバント (\#R) であって、
+定形のマウントポイントを含む Directory tree である。
+ルートFSサーバントのソースコードは、``{\tt src/9/port/devrootfs.c}''である
+\\
+
+サーバントやサーバの名前空間をプロセスの名前空間に接続することにより、
+プロセスはサーバントやサーバのリソースにアクセスすることが可能になる。
+逆にいえば、プロセスの名前空間に接続されていないサーバントやサーバは、
+プロセスには見えないので、
+アクセス権制御の役目も果たす。
+（厳密にいえば、特定のプロセスには、\#S, \#s などのサーバント名による
+  アクセスを許可することもできる。)
+
+つまり、名前空間を接続する際に厳密なアクセス権チェックを行うことで、
+アクセスできる名前を厳密に制御することができる。
+
+
+名前空間の接続の模様を、図 \ref{fig:NSmount}に示す。
+この図において、一番上の三角はルートファイルシステム(\#R)の名前空間を表す。
+記憶メディア(\#S), コンソール(\#c), USB (\#U)などのサーバントは、
+{\tt /dev}に接続されている。
+IPサーバント(\#I)とEtherサーバント(\#l) は、{\tt /net}に接続されている。
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/NSmount.eps}
+    \caption{名前空間とマウント}
+    \label{fig:NSmount}
+  \end{center}
+\end{figure}
+
+
+サーバ登録サーバント{\#s)は、サーバリンク (pipeあるいはTCP接) を
+登録するデータベースである。
+各ファイルサーバは、``{\tt /srv/サービス名}'' というファイルを生成して、
+自分のサーバリンクをそこに書き込んでおく。
+例えばDOSファイルサーバは {\tt /srv/dos}, EXT2ファイルサーバは{\tt /srv/ext2}、
+CD(ISO9660）ファイルサーバは {\tt /srv/9660}
+といった具合である。
+
+たとえば CD の全体({\tt /dev/sdD0/data})を, プロセス名前空間の ``{\tt /t}''
+に接続するコマンドは、以下のとおりである。
+\begin{verbatim}
+       LP49[/]:  mount  -a  /srv/9660  /t  /dev/sdD0/data
+\end{verbatim}
+
+
+{\bf\flushleft (2) プロセス個別名前空間}
+
+  Plan9/LP49では、個々のプロセス毎に自分独自の名前空間 (Directory tree)
+  を持つことができる。
+  これは \verb|rfork(int flags)| 命令のフラッグに {\tt RFNAMEG, RFNAMEG}
+  指定の有無による。
+  \begin{description}
+    \item[RFNAMEG指定の場合]  親プロセスの名前空間のコピーをつくる。
+    \item[RFCNAMEG指定の場合] 名前空間をクリアーする。
+    \item[どちらも指定しない場合] 親プロセスと名前空間を共有する。
+             つまりUNIX の {\tt fork()} と同じ。
+   \end{description}
+
+  また、同一のdirectory に複数のdirectoryをマウント・バインドすることができる。
+  これを ``ユニオンマウント''と呼ぶ。
+  例えば、{\tt /bin. /dev, /net} には、一般に複数のdirectory をマウントしている。
+  このユニオンマシントが、プログラム論理を分かりにくくしている原因の一つではある。
+
+
+
+{\bf\flushleft (3) その他}
+
+   LP49/Plan9 では、各プロセスが個別の名前空間 (Directory tree) を持てる。
+   名前空間の修正は, プロセス生成時、並びにbind あるいはmount コマンドによって行える。
+ 
+  UNIXでは名前空間のマウントには root権限が必要であるが、
+  LP49/Plan9 ではroot権限は不用である。
+
+\begin{description}
+\item[バインド]  サーバントや部分前空間ををマウントポイントに接続する。
+\item[マウント]  サービスサーバをマウントポイントに接続する。
+\end{description}
+
+{\small
+【例】\\
+\begin{verbatim}
+        mount -a   サービスa   /tmp  ...
+        mount -a   サービスb   /tmp  ...
+           →  同一の /tmp ディレクトリに、任意個をマウントできる。
+           属性:  -a: after, -b: before, -c: create, 無指定: replace 
+\end{verbatim}
+}
+
+
+
+\begin{comment}
+{\bf\flushleft  (5) CORE階層内のmalloc()メモリ割り付け}
+
+ 現内容は仮処理であり、メモリプール域としてプロセス内に固定領域を用意している。
+    これは、{\tt Pager}を作り直す際に、本格版に作り直す。\\
+
+ 【主要ソース】 {\tt alloc.c xalloc-l4.c  (in src/9/port)} \\ 
+
+{\bf\flushleft  (6) 低レベルルーチン}
+
+     L4 や マシンとやり取りするための低レベルルーチン類。\\
+
+【主要ソース】 \verb|src/9/pc/_relief-l4.c|   \\
+\end{comment}
+
+
+%%%%%%%%%%%%%%%%%%%%%
+\section{サーバント}
+
+
+\vspace{5cm}
+
+
+
+%%%%%%%%
+\section{サーバとの連携の仕組み}
+
+  ファイルサービスなどのいわゆるＯＳサービスは、CORE階層ではなく、
+ユーザモードプロセスであるサーバによって提供される。
+サーバは、9Pプロトコルを喋れる普通のユーザモードプロセスにすぎない。
+
+クライアントプロセスがシステムコールを行うと、
+その相手がサーバであった場合には、
+   9Pプロトコルメッセージに変換して、
+   パイプ(同一ノード内の場合)あるいは通信コネクション(別ノードの場合)を介して、
+目的サーバに届けられる。
+
+ サーバは、内部にディレクトリートリーを持っているため、
+ ファイルシステムとして change directoryすることで各要素をたどれる。
+
+
+\vspace{5cm}
+
+
+
+
+%%%%%%%%%%
+\section{IPプロトコルスタック} %% \verb|(#I)|}
+
+ IPプロトコルスタックは連携処理の要であるが、
+一般にプログラムは複雑でサイズも大きい。
+  Minix ですら、inet部分は簡明とはいえない。
+ 幸いなことに、Plan9のプロトコルスタック (ソースは src/9/ip/*) は、
+ 比較的簡明で拡張性も高い。
+
+IPプロトコル処理スタックのソース規模は約20K行と大きいので、
+サーバとして実装することも考えられるが、
+現時点では LP49core のサーバントとして組み込んでいる。
+
+IPサービスは、{\tt IP}サーバント (\#I) から提供される。
+また、Etherカード制御は {\tt Ether}サーバント (\#l) から提供される。
+
+なお。IPプロトコルスタックの詳細は、
+別資料 ``{\bf LP49 NW 説明書}''を参照されたい。 
+
+{\bf\flushleft  (1) IPサーバント (\#I, devip.c)}
+
+ プロトコルスタックはIPサーバント (devip) からアクセスでき、
+以下のトリー構成をもつファイルシステムになっている。
+個々の論理コネクションもファイルとして表現されており、
+ {\tt clone}ファイルをオープンすることで生成される。
+ 例えば {\tt tcp/clone} を {\tt open()} すると、
+ 順次論理チャネル {\tt tcp/0, tcp/1, tcp/2,,,,}  が生成される。
+
+モジュール構造としては、{\tt TCP, UDP, IP, ARP, ICMP}などといった
+プログラム毎にモジュール化が行われている。
+
+{\footnotesize
+\begin{verbatim}
+        --+- tcp/ ----+- clone                        
+          |           |- stats                
+          |           |- 0/----+- ctl          
+          |           |        |- data     
+          |                    |- local    
+          |                    |           
+          +- udp/ ---+- clone                        
+          |          |- stats                  
+          |          |- 0/ ---+- ctl            
+          |          |        |-data     
+          |                   |-local    
+          |                   |           
+          +- ipifc/ -----+- clone                         
+          |              |- stats                   
+          |              |- 0/--                    
+          |              |                          
+          +-- ndb/ ----                                   
+          |                                              
+          +-- arp/ ----
+\end{verbatim}
+}
+
+{\bf\flushleft  (2) Etherサーバント (\#l, devether.c)}
+
+\vspace{4cm}
+
+
+%%%%%%%%%
+\chapter{システムコールの受付と実行  syssrv-l4.c}
+
+\section{マルチスレッドサーバの実現法}
+
+  LP49core は、プロセスのシステムコールに対してはサーバとして、
+  サーバプロセスに9pメッセージで仕事を依頼する場合にはクライアントとして
+  機能する。
+
+  モノリシックOSでは、APLのシステムコールはトラップを使ってOSカーネルに飛び込むのに対し、
+本OSのシステムコールは、APLからLP49coreへのメッセージ通信となる。
+  システムコールの仕組みを、図 \ref{fig:LP49syscall}に示す。
+\\
+
+{\bf\flushleft (1) ライブラリによるL4メッセージ化}
+
+   APLのシステムコールは, 使い慣れた関数呼び出し 
+({\tt open(...), read(...), write(...),,,})  である。
+  ライブラリは、これを L4 メッセージに変換して LP49core に送り、返答メッセージを待つ。
+  APLとLP49coreは別論理空間なので、アドレス引き継ぎは使えない。
+  システムコールの引数はL4メッセージの値コピー, 
+  バッファー域はL4メッセージのページマップ機能を使って引き継いでいる。
+\\
+
+{\bf\flushleft (2) LP49core マルチスレッドサーバ}
+
+    システムコールの処理は中断が生じうる。
+    複数の処理を並行して処理するために、
+    マルチスレッドサーバ方式を実装している。
+
+    要求メッセージは {\tt Mngr}スレッドに送られる
+    (L4メッセージの宛先はスレッドである)。
+    {\tt Mngr}スレッドは、スレッドプールから空き{\tt clerk}スレッドを
+    割り当てて、それに処理を行わせる。
+\\
+
+{\bf\flushleft (3) サーバントアクセスの仕組み}
+  
+    システムコールの対象がサーバントである場合は、
+    図 \ref{fig:LP49syscall}に示すように {\tt clerk}スレッドが
+    サーバントの関数を呼び出す。
+\\
+
+{\bf\flushleft (4) サーバアクセスの仕組み }
+
+    システムコールの対象がサーバである場合は、
+    図 \ref{fig:LP49syscall}に示すように
+    {\tt clerk}スレッドは {\bf Mntサーバント} を呼ぶ。
+    {\tt Mnt}サーバント(\#M)はサーバをマウントするための仕組みであり、
+   システムコール引数から9Pメッセージを編集して、
+    目的サーバがノード内の場合は Pipeサーバント,
+    別ノードの場合は TCPコネクションを経由して、Remote Procedure Callを行う。
+
+
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/LP49syscall.eps}
+    \caption{システムコール}
+    \label{fig:LP49syscall}
+  \end{center}
+\end{figure}
+
+    
+
+
+○　Explanation : to be added
+
+\vspace{4cm}
+
+ 
+\section{システムコールのパラメータ、データ引き継ぎ}
+
+   LP49のシステムコールは、クライアントプロセスからCOREプロセスへのメッセージ通信となる。
+L4マイクロカーネルの高速なメッセージ通信が活躍している。
+データ引き継ぎは、以下のように実装している。
+\\
+
+{\bf\flushleft (1) 文字列パラメータの引き継ぎ}
+
+\begin{description}
+    \item[Plan9]  文字列パラメータは call-by-reference で送り、カーネルがユーザ空間に直接アクセス。
+    \item[LP49]  パラメータは全て call-by-value で送る  (L4の string copy)
+\end{description}
+
+
+{\bf\flushleft  (2) バッファデータの引き継ぎ}
+
+  \begin{description}
+     \item[Plan9] アドレスを引き継いで、カーネルがユーザ空間に直接アクセス。
+     \item[LP49]  該当バッファを含むクライアントページをLP49coreにマッピンクして、
+         読み書きさせている。L4 の Page mappink 機能は、Flex page  
+         (サイズが $2^n$ ページで、
+         かつ開始アドレスが $2^n$ バウンダリでナケレバならない) 単位なので、
+         場合によってはかなりの空間がマップされる可能性がある。
+        また、データサイスが小さい場合は、L4 の string copy を使った方が効率的である。
+        これは簡単な改善課題であるので、試みられたい。
+  \end{description}
+
+
+
+
+%%%%%%%%%
+\chapter{プロセス管理}
+
+\section{プロセス管理テーブル Proc (src/9/port/portdat.h)}
+      {\tt Proc}テーブルはプロセス対応に存在しており、LP49プロセスの管理情報を記録している。
+HVM層やCORE層はL4のプロセスであるが、LP49のプロセスではないので、
+本{\tt Proc}テーブルの対象ではない。
+スケジューリングやコンテクスト切替は本テーブルの役目ではなく L4 マイクロカーネルが行う。
+現{\tt Proc}テーブルはLP49では不要なPlan9用フィールドが残っているが、
+そのうちにソースプログラムから削除する予定である。
+
+      {\tt Proc}テーブル主要フィールドを以下に示す。
+
+{\small
+\begin{verbatim}
+          *------ Proc ---------*                                        
+          | L4_thread_t  thread | ← L4 スレッドのID を記憶      
+          |   :                 |                                 
+          | Proc  *parent       | ← 親プロセスへのポインタ
+          |   :                 |                               
+          | Pgrp  *pgrp         | ← 名前空間へのポインタ (複数プロセスで共用可)
+          | Egrp  *egrp         | ← 環境変数空間へのポインタ (複数プロセスで共用可)
+          | Fgrp  *fgrp         | ← ファイル記述子テーブルへのポインタ(複数プロセスで共用可)
+          |   :                 |                                  
+          *---------------------*                                            
+\end{verbatim}
+}
+
+\section{プロセス管理プログラム Proc (proc-l4.c, sysproc-l4.c in src/9/port/)}
+
+{\bf\flushleft (1) proc-l4.c}
+
+○　説明：To be added
+
+\vspace{4cm}
+
+
+
+{\bf\flushleft (2) sysproc-l4.c}
+
+○　説明：To be added
+
+\vspace{4cm}
+
+
+
+%%%%%%%
+\chapter{抽象ファイル操作とサーバント}
+
+\section{オブジェクト指向としてのとらえ方}
+
+Plan9と同様、LP49 では殆どのリソースを``ファイル''として抽象化している。
+個々の``抽象ファイル''は、サーバント内あるいはサーバ内に存在し、
+名前空間(directory tree)に登録されている。
+抽象ファイルは、{\tt create(), open(), read(), write(),,,}等の
+統一ファイルインタフェースで操作できるオブジェクトである。
+
+サーバ内のファイルは、サーバをマウントすることによって、
+LP49coreがアクセスできるようになる。
+サーバのマウントを行うのは{\bf マウントサーバント(\verb|#M|)}である。
+サーバ内ファイルにアクセスしようとすると、
+マウントサーバントはそのファイルに対応した{\bf 代行(Proxy)オブジェクト}
+を割り当てる。
+代行オブジェクトは操作を受けると、9Pメッセージに変換して
+サーバに処理を依頼する。
+サーバアクセスに付いては、後で詳しく述べる。
+
+このように LP49core からは、サーバントがファイル操作の要となる。
+サーバントは、オブジェクト指向の観点からは、
+図 \ref{fig:VirtualFileObject}に示すように
+``抽象ファイル''はインスタンスオブジェクト、
+``サーバント定義''はクラス定義に相当する。
+各サーバントは同一のインタフェースを有する。
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{fig/VirtualFileObject.eps}
+    \caption{仮想ファイルのオブジェクトモデル}
+    \label{fig:VirtualFileObject}
+  \end{center}
+\end{figure}
+
+
+\begin{itemize}
+\item  各サーバントプログラムはクラス定義に相当し、
+  attach(), init(), open(), read(), write(),,, 等のメソッドコードを持ち、
+  メソッドテーブルを介して呼ばれる。
+\item  ``抽象ファイル''は、インスタンスオブジェクトであり、
+   サーバントの名前空間に登録されている。
+   以下では {\bf VF(抽象ファイル)オブジェクト}と呼ぶ。
+
+\item  VFオブジェクトは、qidという値によりサーバント内でユニークに識別される。
+       Qid は Unix の inode番号に相当する。
+
+\item  一般のオブジェクト指向言語と違って、同一クラス(サーバント)内でも
+       VFオブジェクトのデータ構成は同一とは限らない。
+       各メソッドはVFオブジェクトのqidから、そのデータ構成を判定し、
+       対応した処理を行う。
+\end{itemize}
+
+  LP49core内では、VFオブジェクトは{\bf オブジェクトハンドル}を介してアクセスされる。
+オブジェクトハンドル({\tt objH})は、サーバント識別情報({\tt typeフィールド}), 
+VFオブジェクトのqid ({\tt qidフィールド}), 
+その他の管理情報が載ったテーブルである。
+{\bf Plan9 のソースコードを流用したので、
+プログラム上ではChan(nel)タイプのテーブルとなっている。
+以下 Chanテーブルはオブジェクトハンドルと理解されたい。}
+LP49coreは、
+オブジェクトハンドルの{\tt typeフィールド}からサーバントの各メソッドをアクセスし、
+{\tt qidフィールド}からインスタンスを決定する。
+%
+ここではVFオブジェクト $\alpha$ を指すオブジェクトハンドルを
+``{\tt objH\{$\alpha$\}}''と表記する。
+
+オブジェクトハンドルは、対象を{\tt open(), create()}した時や、
+change directory された時に割り当てられ、
+参照カウンタが 0 になったときに消去される。
+
+
+
+\begin{comment}
+Plan9と同様、LP49 では殆どリソースを「ファイル」として抽象化している。
+個々の``抽象ファイル''は、サーバント内あるいはサーバ内に存在し、
+名前空間(directory tree)を通してアクセスされる。
+
+これは、図 \ref{fig:VirtualFileObject}に示すように、
+オブジェクト指向の観点から、
+``抽象ファイル''をインスタンスオブジェクト、
+``サーバント定義''をクラス定義
+として捉えると理解し易い。
+
+\begin{figure}[hbt]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/VirtualFileObject.eps}
+    \caption{仮想ファイルのオブジェクトモデル}
+    \label{fig:VirtualFileObject}
+  \end{center}
+\end{figure}
+
+\begin{itemize}
+\item  全てのサーバントは同一のメソッドインタフェースをもつ。
+\item  サーバントプログラムはクラス定義に相当し、各メソッドコードを持つ。
+\item  各メソッドは、メソッドテーブル経由で呼ばれる。
+\item  ``抽象ファイル''は、インスタンスオブジェクト(抽象ファイルオブジェクト)である。
+\item  抽象ファイルオブジェクトは、サーバントの名前空間に載っている。
+\item  抽象ファイルオブジェクトは、Qidと言う値により、サーバント内でユニークに識別される。
+       Qid は Unix の inode番号に相当する。
+\item {\bf 一般のオブジェクト指向と違って、同一サーバント(クラス)内でも
+           抽象ファイルオブジェクトのデータ構成は同一とは限らない。
+           各メソッドは抽象ファイルオブジェクトのQidから、そのデータ構成を判定し、
+           対応した処理を行う。}
+\item   抽象ファイルオブジェクトを{\tt open()} すると、
+       LP49core内では ``Chanテーブル''(後で詳しく述べる)が割り当てられ、
+       サーバントのメソッドテーブルへの識別情報と
+       抽象ファイルオブジェクトの Qid などが設定される。
+       つまり、Chanテーブルはオブジェクトハンドルとして機能する。
+\end{itemize}
+\end{comment}
+
+
+\section{Devテーブル Dev (src/9/port/portdat.h)}
+
+
+``{\tt Dev}テーブル''とは、上で述べたメソッドテーブルであり、
+サーバントプログラム毎に存在する。
+
+{\tt Dev}構造体の定義を以下に示す。
+これがサーバントの統一インタフェースである。
+
+{\small
+\begin{verbatim}
+   【抽象ファイルのインタフェース】
+    struct Dev
+    {
+        int     dc;    // サーバントを識別する1文字。#I の'I'など。
+        char*   name;  // サーバントの名前
+        void    (*reset)(void);
+        void    (*init)(void);
+        void    (*shutdown)(void);
+        Chan*   (*attach)(char*);
+        Walkqid*(*walk)(Chan*, Chan*, char**, int);
+        int     (*stat)(Chan*, uchar*, int);
+        Chan*   (*open)(Chan*, int);
+        void    (*create)(Chan*, char*, int, ulong);
+        void    (*close)(Chan*);
+        long    (*read)(Chan*, void*, long, vlong);
+        Block*  (*bread)(Chan*, long, ulong);
+        long    (*write)(Chan*, void*, long, vlong);
+        long    (*bwrite)(Chan*, Block*, ulong);
+        void    (*remove)(Chan*);
+        int     (*wstat)(Chan*, uchar*, int);
+        void    (*power)(int);  // power mgt: power(1) 
+        int     (*config)(int, char*, DevConf*); 
+    };
+\end{verbatim}
+}
+
+{\tt Dev}テーブルは各メソッドへのリンク表であり、
+C++言語の仮想関数テーブル {\tt vtbl}に相当する。
+各サーバントは、{\tt Dev}インタフェースの実装と考えられる。
+
+
+
+\section{オブジェクトハンドラ (Chan テーブル)}
+
+前述のように、LP49 では処理対象を「抽象ファイル」、
+つまり``{\tt Dev}インタフェースを持つオブジェクト''として扱っている。
+
+LP49core内では、各オブジェクトはオブジェクトハンドル経由でアクセスされる。
+LP49はPlan9のソースコードに修正を行っているので、
+オブジェクトハンドルは{\tt Chan} (channelの意)タイプのテーブルである。
+定義は{\tt  src/9/port/portdat.h} に含まれている。
+
+{\tt Chan}テーブルは、LP49coreが抽象ファイルにアクセスするのに必要な情報を
+載せたテーブル (抽象ファイルアクセスの把手＝``ハンドラ''）である。
+ 例えばファイルを {\tt open( )} すると LP49core内部では{\tt Chan}テーブルが用意され、
+{\tt write( ), read( )}などの操作は {\tt Chan} テーブルを経由して行われる。
+
+  {\tt Chan}テーブルの主要フィールドを以下に示す。
+
+{\small
+\begin{verbatim}
+          +----- Chan ----------+                                 
+          |    :                |                         
+          | vlong  offset       | ← ファイル内オフセット
+          |   :                 |                         
+          | ushort  type        | ← デバイスタイプ (Unixの major# に相当)
+          | ulong   dev         | ← デバイスの番号 (Unixの minor# に相当)
+          | ushort  mode        | ← ファイルアクセスモード
+          |   :                 |                       
+          | Qid     qid         | ← ユニークな識別子 (Unixの inode番号に相当)
+          | int     fid         | ← サーバマウントで多重化識別に使う
+          |   :                 |
+          | Mhead   *umh        | ← マウントサーチに使う                     
+          |   :                 | 
+          | Mnt     *mux        | ← サーバマウントの多重化に使う
+          |   :                 | 
+          | Cham   *mchan       | ← サーバリンク
+          |   :                 |                                            
+          | Path   *path        | ← パス名
+          +---------------------+                                                      
+\end{verbatim}
+}
+
+
+図\ref{fig:Chan-table}に示すように、
+{\tt Chan}テーブルはファイルとして抽象化されたオブジェクトを
+統一的に扱うためのハンドルである。
+
+{\tt Chan.type}フィールドは、{\tt Dev}テーブルへのリンク情報になっている。
+{\tt Dev}テーブルはサーバント対応に用意されており、
+このテーブルを見て実行するメソッドを決定するわけである。
+UNIXでいえば{\tt Chan.type}フィールドは、major番号に相当する。
+
+UNIXでいえば, {\tt Chan.dev}フィールドは minor番号に。
+{\tt Chan.qid}フィールドは inode番号に相当する。
+
+Unix においてファイルが \{Major番号、Minor番号, inode番号\} によってユニークに
+識別されるように、
+LP49においては全抽象ファイルが\{type、dev, qid\} によってユニークに識別される。
+
+また、処理によっては \verb| Chan._u| フィールドに、
+個別データがつながれる場合もある。
+\\
+
+{\tt read( ), write( )}などの操作は、 
+{\tt type}フィールド経由で {\tt devfloppy.c} で定義されている 
+{\tt fdread( ), fdwrite( )}などが呼び出される。
+
+\begin{figure}[hbt]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/Chan-table.eps}
+    \caption{Chan構造体とオブジェクト構成}
+    \label{fig:Chan-table}
+  \end{center}
+\end{figure}
+
+
+ 例えば {\tt /dev/fd0} (フロッピードライバ) を {\tt open( )}すると、
+LP49coreは{\tt /dev/fd0}を見つけ、
+それに対するアクセスハンドルとして{\tt Chan}テーブルを生成し、
+各フィールドを設定する。
+{\tt Chan.type}フィールドには、FDサーバント {\tt devfloppy} 
+の番号が設定される。
+
+
+
+%%%%%%%%
+\section{サーバントの一般構造}
+
+  サーバントのソースプログラムはソフトウェア部品の好例であり、
+各々 {\tt devxxx.c} というファイル名のソースモジュールである。
+なお {\tt dev.c} はサーバント間で共通に使われる関数を定義している。
+\\
+
+サーバントのプログラム構造は、オブジェクト指向としてとらえると理解しやすい。
+各サーバントは、ファイルインタフェースを持つオブジェクト
+（以下``仮想ファイルオブジェクト''と呼ぶ）
+の集まりを管理している。
+このファイルインタフェースとは、{\tt Dev}構造体で定義されている関数
+({\tt create(), open(), write(), read(), stat(),,,,})
+を意味する。
+
+各仮想ファイルオブジェクトは、サーバントの名前空間 (directory tree)につながれており、
+path名でアクセスすることができる。
+\\
+
+Unixでは、各ファイルが``inode''番号によりファイルシステム内でユニークに識別されるように、
+LP49/Plan9では, 個々の仮想ファイルオブジェクトは{\tt Qid} により、
+サーバント内でユニークに識別されている。
+{\tt Qid}は、以下の構造体である。
+
+\begin{verbatim}
+     typedef struct Qid {
+        uvlong  path;  //サーバント内でユニークな番号
+        ulong   vers;  // version番号。内容が更新される毎に+1
+        uchar   type;  //オブジェクトのタイプ
+     } Qid;
+\end{verbatim}
+
+仮想ファイルオブジェクトのインタフェースは統一されているが、
+同一サーバント内でもメソッド内容は同じ必要はない。
+例えば、メソッドはオブジェクトの{\tt Qid}が与えられると、
+{\tt Qid.type}を見て、それに応じた処理を行う。
+\\
+
+
+サーバントのソースプログラム {\tt devxxx.c} は、一般に以下のような内容を持っている。
+
+{\small
+\begin{verbatim}    
+  /********* devxxx.c **********/
+  #include        .....
+       :
+
+  ststic void xxxinit(void)   // initメソッド
+  {     .......           }
+
+  static Chan* xxxattach(char* spec)  // attachメソッド
+  {       .......         }  
+
+  static Walkqid* xxxwalk(Chan* c, Chan *nc, char** name, int nname)
+  {       .........       }
+
+  static int  xxxstat(Chan* c, uchar* dp, int n) // statメソッド
+  {        ........       }
+
+  static Chan* xxxopen(Chan* c, int omode) // openメソッド
+  {        ........       }
+
+  static void xxxclose(Chan* _x) // closeメソッド
+  {   .........           }
+
+  static long xxxread(Chan* c, void* buf, long n, vlong off) //readメソッド
+  {        ........       }
+      :
+
+  static long xxxwrite(Chan* c, void* buf, long n, vlong off) //writeメソッド
+  {        .......       }
+
+  Dev xxxdevtab = {   //この Devテーブル経由で呼ばれる
+        'r',       //このサーバントを識別する１文字。#S の'S'など。
+        "xxx",     // サーバントの管理名
+        devreset,  // dev.cの関数
+        xxxinit,
+        devshutdown,// dev.cの関数
+        xxxattach,
+        xxxwalk,
+        xxxstat,
+        xxxopen,
+        devcreate,　// dev.cの関数
+        xxxclose,
+        xxxread,
+        devbread,　// dev.cの関数
+        xxxwrite,
+        devbwrite, // dev.cの関数
+        devremove, // dev.cの関数
+        devwstat   // dev.cの関数
+  };
+
+\end{verbatim}
+}
+
+
+各メソッドは、外部から {\tt Dev} テーブル経由でアクセスされる。
+プロセスが {\tt devxxx} にアクセスする仕組みを以下に示す。
+
+\begin{verbatim}
+   Fgrp  *fgrp = Proc(プロセス)テーブルのfgrpの値;
+   Chan *c = fgrp->fd[fd]; //プロセスの fdグループテーブル を fd でindexして
+                           //Chanテーブルを求める。
+
+   n = devtab[c->type]->read(c, ...); // chan->type値で devtabをindexして
+                                      // devxxx の Devテーブルにアクセスし、
+　                                    // xxxread(...)を実する。
+\end{verbatim}
+
+メソッドは、{\tt Chan} 引数から {\tt Qid}情報を求めて目的オブジェクトにアクセスし、
+{\tt Qid.type }に応じた処理を行う。
+
+
+%%%%%
+\section{Servantはファイルシステムである}
+
+{\bf\flushleft   (1) 名前空間}
+
+  サーバントの各要素はディレクトリトリー (つまり名前空間) に載っており、
+ファイルとしてアクセスや操作を行うことができる。
+だから、サーバントもファイルシステムである。
+change directoryして各要素をたどれる。
+
+サーバント名をプロセスの名前空間に結合 (bind) することにより、
+プロセスからサーバントの各要素もアクセスすることができるようになる。
+
+例えば  IPサーバント (\#I, Internetプロトコル) は、以下のように名前空間を構成している。
+IPサーバントは、プロセス名前空間の通常 {\tt /net} に接続される。
+
+{\small
+\begin{verbatim}
+            --- net/ ---+-- tcp/ ---+-- stat               
+                        |           |-- clone        
+                        |           |-- 0/ --+-- ctl   ←  コネクション-1 
+                        |           |        |--  data                
+                        |           |        |--  local               
+                        |           |        :                       
+                        |           |-- 1/ --+--ctl    ←  コネクション-2    
+                        |           |    :   |--  data  
+                        |           |        |--  local 
+                        |           |        :         
+                        |                        
+                        +-- udp/ ---+-- stat         
+                        |           |-- clone        
+                        |           :          
+                        :                        
+\end{verbatim}
+}
+                                                       
+  個々のコネクションもファイルとして表現されており、
+{\tt clone}ファイルをオープンすることで生成される。
+例えば  {\tt tcp/clone} を {\tt open()} すると、
+順次 {\tt tcp/0, tcp/1, tcp/2,,,,}  が生成される。
+    
+{\bf\flushleft  (2) qid}
+
+  サーバント内の各要素は、下記構造の "Qid" によってユニークに識別される。
+これは、UNIXファイルシステムの各ファイルが inode 番号によってユニークに識別される事に該当する。
+
+\begin{verbatim}    
+      typedef struct Qid {                                +-8 -*--32-+--64----*
+         uvlong  path;     // 64bits                      |type|vers | path   |
+         ulong   vers;     // 32bits                      *----*-----*--------*
+         uchar   type;  ← QTDIR, QTAPPEND, QTEXECL, QTMOUNT, QTAUTH, ,,,
+      } Qid;
+\end{verbatim}    
+
+    qid の各フィールドの意味は以下のとうりである。
+\begin{description}
+\item[path]  64ビットのユニーク値
+\item[vers]  Version番号で、更新されるごとにカウントアップされる。
+\item[type]  ディレクトリ (QTDIR), 追加のみ(QTAPPEND) などの属性
+\end{description}
+    
+{\bf\flushleft (3) デバイスの設定コマンド}
+
+   各デバイスは、一般に設定コマンドを受け付けるファイル ({\tt ctl}ファイルなど) を持っている。
+  デバイスのモードなどを設定するには、このファイルにascii文字のコマンドを書き込めばよい。
+  ascii文字なので、人間が読むことができ、またCPUのEndianにも左右されない。
+
+
+
+
+
+\section{代表的なサーバント}
+
+
+{\bf\flushleft (1) コンソールサーバント \verb|#c|}
+\\
+
+{\bf\flushleft (2) ストレッジサーバント \verb|#S|}
+\\
+
+{\bf\flushleft (3) FDDサーバント \verb|#S|}
+\\
+
+{\bf\flushleft (4) USBサーバント \verb|#U|}
+\\
+
+{\bf\flushleft (5) 環境変数サーバント \verb|#S|}
+\\
+
+{\bf\flushleft (6) Procサーバント \verb|#p|}
+\\
+
+{\bf\flushleft (7) Pipeサーバント \verb$#|$}
+\\
+
+{\bf\flushleft (8) Rootファイルサーバント \verb|#R|}
+\\
+
+{\bf\flushleft (9) サーバ登録簿 \verb|#e|}
+\\
+
+{\bf\flushleft (10) マウントサーバント \verb|#M|}
+
+マウントサーバントは、システムコールを9Pメッセージに変換してサーバと通信を行う
+プログラムである。重要機能であるので、別途詳細に説明する。
+\\
+
+{\bf\flushleft (11) Etherサーバント \verb|#l|}
+\\
+
+{\bf\flushleft (12) IPサーバント \verb|#I|}
+\\
+
+{\bf\flushleft (13) VGAサーバント \verb|#V|}
+\\
+
+
+
+
+
+
+%%%%
+\chapter{名前空間の管理}
+
+
+\section{名前サーチ：パス名から目的オブジェクトを求める}
+
+
+ここでの名前サーチとは、
+パス名 (例： ``{\tt /a/b/c/d}'') から目的の仮想ファイルオブジェクトを見つけることをいう。
+
+LP49/Plan9 では、プロセスに見える名前空間は、
+サーバントやサーバの名前空間を接続(マウント）したものである。
+また、同一のマウントポイントに複数をマウントすることができる(``ユニオンマウント'')
+という特長がある。
+このために名前サーチは、かなり複雑な処理となっている。
+
+サーバント内の名前サーチは、各サーバントの役目である。
+各サーバントは以下の形式の{\tt walk()}関数を持っている。
+{\tt walk}は {\tt change directory} 思ってよい。　
+先に説明したように、directoryを含めて仮想ファイルオブジェクトは全て
+{\tt Chan}テーブルで表現されている。
+\tt Chan}テーブルは、仮想ファイルオブジェクトのハンドルである。
+
+\begin{verbatim}
+static Walkqid*  walk(Chan *startChan, Chan *targetChan, char *names[], int numOfNames);
+    startChan: [入力]　名前サーチの開始点を表すChanテーブル
+    targetChan:[出力]　目的オブジェクトを表すChanテーブル
+    names: [入力]　名前の配列  
+    numOfNames: [入力]  名前の配列の様子数
+    返り値： directory のたどり方の情報
+\end{verbatim}
+
+サーバント内の名前サーチは、この関数を呼ぶことで完結する。
+プロセスに見える名前空間は、多数のサーバントやサーバの名前空間が
+マウントされたものであるので、
+全体としての名前サーチは、マウントポイントを見つけながら
+各サーバントやサーバをたどっていく必要がある。
+その処理の中心となるのが、{\tt chan.c} プログラムである。
+
+
+%%%%
+\section{チャネルプログラム chan.c}
+
+   chan.c は、各プロセスの名前空間管理の中核をなすプログラムである。
+   ソースコードは、``\verb|src/9/port/chan.c|''である。
+   本プログラムに含まれる代表的な関数を以下に示す。
+
+{\bf\flushleft  (1) Chan * namec(char *name, int amode, int omode, ulomg permission);}
+
+        パス名 ({\tt name}) からチャネル ({\tt Chan})テーブルを求める関数である。
+        Unix の {\tt namei( )}関数に相当するが、
+        Unix の{\tt namei( )} は inode番号を返すのに対し、
+        本{\tt namec( )} は {\tt Chan}テーブルを返す。
+\\
+    
+{\bf\flushleft    (2) int walk(Cham **cp, char **names, int nnames, int nomount, int *nerror);}
+
+        "Change directory" を行う関数である。
+
+        例えば、第1 パラメータの{\tt Chan}サーブルが {\tt "/a"} を指しているとし、
+        第2パラメータの{\tt names} が \verb|{"b", "c"}| だったとすると、
+        {\tt "/a"}から順次 {\tt "b", "c"} を探して行き、第１パラメータに
+        {\tt "/a/b/c"}の{\tt Chan}テーブルを返す。
+        \\
+
+     
+{\bf\flushleft  (3) cmount(...), domount(...), findmount(...), など}
+
+   マウントの処理を行う関数である。
+具体的な処理内容は、次のセクションで説明する。
+
+   Plan9 の{\tt chan.c}は、
+開発スタート時から拡張に拡張をつづけてきたプログラムだけに、
+大変に込み入って難解になっている。
+解読にチャレンジしてみてほしい。
+現LP49 ではPlan9 の {\tt chan.c} を最小量修正で利用しているが、LP49 phase2 では
+名前空間の管理法を根本的に見直して処理を徹底的に簡素化する予定である。
+
+
+
+
+\section{マウントの仕組み}
+
+    プロセス個別名前空間は Plan9 の一大長所であり、
+プロセス毎に個別の名前空間を構成できる融通性、
+アクセス権保護に非常に効果的である。LP49 も強力なこの仕組みを継承している。
+
+    また、同一のマウントポイトに複数のファイルトリーをマウントできる
+``ユニオンマウント''も、  Plan9 およびLP49 の融通性の一つである。
+  Unix では同一のマウントポイントに複数のファイルトリーをマウントすると、
+最後のもののみがアクセス可能で、それ以外は隠されてしまうのに対し、
+  ユニオンマウントでは(同一名前でない限り) 複数
+  のファイルトリーが同一ディレクトリに現れる。
+
+
+名前空間管理の中核をなすのは、``\verb| Pgrp, Mhead, Mount|''の各テーブル
+(ソースは ``\verb|src/9/port/portdat.h|'')と、
+``\verb|chan.c|''プログラム (ソースは ``\verb|src/9/port/chan.c|'')である。
+
+プロセステーブルは名前空間テーブル Pgrp へのポインタをもっている。
+ 名前空間を共用するプロセス群は、同一の Pgrp テーブルにポイントしている。
+
+
+\begin{figure}[hbt]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/MountStruct.eps}
+    \caption{名前空間マウントのデータ構造}
+    \label{fig:MountStruct}
+  \end{center}
+\end{figure}
+
+名前空間のマウントのデータ構造を
+図\ref{fig:MountStruct}に示す。
+この例では、マウントボイント「$\alpha$」に「$\beta$」と「$\gamma$」が
+ユニオンマウントされている。
+$\alpha$, $\beta$, $\gamma$は {\tt Chan}テーブルで表現されている。
+
+この様に(マウントポイントを含めて）全てのオブジェクトは{\tt Chan}
+テーブルで表現されている。
+{\tt Chan}テーブルは、オブジェクトアクセスのハンドルと説明したとうりである。
+
+目的オブジェクトの識別は、
+サーバント種別 ({\tt Chan.type})とサーバント内ユニーク値 ({\tt Chan.qid})
+が合致するか否かでおこなわれる。これを``検索情報''とよぶことにする。
+
+今パス名に``$\alpha$''が含まれているとする。
+マウントの解決は、以下の様に行われる。
+
+\begin{enumerate}
+\item  {\tt Proc}(プロセス)テーブルの{\tt pgrp}(process group)フィールドから、
+  {\tt Pgrp}テーブルにアクセスする。
+   {\tt Pgrp}テーブルは、このプロセスが属する名前空間を表す。
+
+\item   ``検索情報''のハッシュ値で {\tt Pgrp.mnthash[...]}をindexして
+    {\tt Mhead} のハッシュリンクにアクセスする。
+
+\item    {\tt Mhead.from} フィールドから{\tt  Chan}テーブルにアクセスする。
+        これは、マウントポイントを意味する。
+        これが``$\alpha$''と一致したら、マウントポイントが見つかった分けである。
+         一致しなかった場合はhashリンクをたどる。
+
+\item   ``$\alpha$''と一致した場合は、これがマウントポイントなので、
+       ここにマウントされている部分トリー上で探すことになる。
+
+       具体的には、{\tt Mhrad.mount} から{\tt Mount}テーブルにアクセスし、
+       {\tt Mount.to} をたどってマウントされている部分トリーの{\tt Chan}
+       テーブルにアクセスする。こうして、$\beta$, $\gamma$ を調べる。
+
+\item   $\beta$, $\gamma$のどちらが先にサーチされるかは、mount/bind コマンドの
+  オプション ({\tt -a: after, -b: before, 無指定：replace })による。
+
+\end{enumerate}
+
+\vspace{4cm}
+
+
+
+
+%%%%%%
+\chapter{サーバ接続とマウントサーバント}
+%%%%%%
+\section{9P: サーバとの通信プロトコル}
+
+  9Pプロトコルは、レイア的にはNFS分散ファイルサーバのプロトコルと同等であるが、
+  NFSがステートレス指向であるのに対し、9P はステートフルである。
+  制御システム用として9Pが充分であるか否かは、これからの検討課題である。
+
+   9Pプロトコルの一覧を以下に示す。
+
+   フィールド{\tt [n]}は、このフィールドのデータ長が n byteであることを、
+{\tt [s]}は可変長であることを示す。
+{\tt Txxx}はコマンド名、{\tt Rxxx}は返答名であり、1バイトを占めている。
+
+{\tt tag}フィールドと{\tt fid}フィールドは多重処理のための識別子であり、
+以下の内容をもつ。
+File descriptor (FD値) はサーバ側が決定するのに大して、
+{\tt tag, fid} はクライアント側が与える。
+
+\begin{description}
+\item[tag]　要求メッセージと返答メッセージの対応をとる番号。
+\item[fid]  各``仮想オブジェクトファイル''を識別する番号。
+\end{description}
+
+
+
+
+例えば『{\tt size[4] Tversion tag[2] msize[4] version[s]}』は、
+  {\tt size[4]}=本メッセージのトータルサイズ、
+  {\tt Tversion}=プロトコルversionチェックコマンド、
+  {\tt tag[2]}=コマンドと応答の対応をとるタグ、
+  {\tt msize[4]}=許容最大メッセージサイズ、
+  {\tt version[s]}=version名、を意味する。
+    
+{\small
+\begin{verbatim}
+     size[4] Tversion tag[2] msize[4] version[s]   → プロトコルのversion
+     size[4] Rversion tag[2] msize[4] version[s]
+     size[4] Tauth tag[2] afid[4] uname[s] aname[s]    → 認証
+     size[4] Rauth tag[2] aqid[13]
+     size[4] Rerror tag[2] ename[s]
+     size[4] Tflush tag[2] oldtag[2]
+     size[4] Rflush tag[2]
+     size[4] Tattach tag[2] fid[4] afid[4] uname[s] aname[s]    → マウント
+     size[4] Rattach tag[2] qid[13]
+     size[4] Twalk tag[2] fid[4] newfid[4] nwname[2] nwname*(wname[s])  → change directory
+     size[4] Rwalk tag[2] nwqid[2] nwqid*(wqid[13])
+     size[4] Topen tag[2] fid[4] mode[1]                → Open( )
+     size[4] Ropen tag[2] qid[13] iounit[4]
+     size[4] Tcreate tag[2] fid[4] name[s] perm[4] mode[1]
+     size[4] Rcreate tag[2] qid[13] iounit[4]
+     size[4] Tread tag[2] fid[4] offset[8] count[4]
+     size[4] Rread tag[2] count[4] data[count]
+     size[4] Twrite tag[2] fid[4] offset[8] count[4] data[count]
+     size[4] Rwrite tag[2] count[4]
+     size[4] Tclunk tag[2] fid[4]
+     size[4] Rclunk tag[2]
+     size[4] Tremove tag[2] fid[4]
+     size[4] Rremove tag[2]
+     size[4] Tstat tag[2] fid[4]
+     size[4] Rstat tag[2] stat[n]
+     size[4] Twstat tag[2] fid[4] stat[n]
+     size[4] Rwstat tag[2]
+\end{verbatim}
+}
+
+  これから分かるように、９Pプロトコルは要求と返答が対になった同期型のやりとりである。
+  (更に多様な分散処理をサポートするために、将来的には非同期型の拡張も考えられる。）
+
+
+
+    
+%%%%
+\section{サーバリンクとサーバ登録サーバント /srv }
+
+{\bf\flushleft (1) サーバリンク}
+
+  LP49core とサーバは、9P メッセージをpipe あるいは TCP接続を通して通信し合う。
+  サーバに接続された pipe あるいは TCP 接続を``{\bf サーバリンク}''と呼んでいる。
+  サーバリンクは多重化されている。つまり、複数の9Pメッセージが
+  一つのサーバリンクの中を流れる。
+\\
+
+{\bf\flushleft (2) サーバ登録サーバント /srv}
+
+サーバ登録サーバント(\#s)は、サーバリンクを登録しておくデータベース
+(サーバ登録簿)であり、{\tt /srv}に接続されている。
+サーバ登録サーバントの各エントリーは、
+{\tt /srv/ServiceName} という名前のファイルである。
+これらのファイルの中身は、LP49coreが理解できるサーバリンク情報であり、
+人間が読むものではない。
+\begin{verbatim}
+【例】 
+     /srv/dos   (DOSファイルサーバ）
+     /srv/ext2  (EXT2ファイルサーバ）
+     /srv/9660  (ISO9660形式CDファイルサーバ）
+
+\end{verbatim}
+
+ サーバ登録サーバントのソースコードは、{\tt src/9/port/devsrv.c}) である。
+これは簡単なプログラムである。
+\\
+
+{\bf\flushleft (3) ローカルサーバの場合のサーバ登録}
+
+ローカルサーバは、サーバリンクとして一般にpipe を使う
+(もちろん TCP接続も使えるが）。
+
+大部分のサーバは、立ち上げると pipeを生成して自動的に {\tt /srv/ServiceName}
+に登録する。
+この ``ServieName'' は起動時に指定することが出きるし、
+指定しなければ default の名前が使われる。
+
+自動登録でないサーバの場合は、
+{\tt /src/SrviceName}ファイルを{\tt create} して、
+そこに pipe あるいは　TCP接続の file descriptor を書き込む
+ことでサーバ登録が行われる。
+
+\vspace{4cm}
+
+
+{\bf\flushleft (4) リモートサーバの場合のサーバ登録}
+
+リモートサーバの場合は、TCP接続がサーバリンクとなる。
+\\
+
+○  announc, listen, accept
+
+○  /bin/srv
+
+
+
+\vspace{6cm}
+
+
+
+{\bf\flushleft (5) サーバのマウント}
+
+
+サーバリンクをクライアントプロセスの名前空間にマウントすることで、
+サーバの名前空間が見えるようになる。
+
+\begin{verbatim}
+     【マウントコマンド】
+      mount  [ option...]  /srv/ServiceName マウントポイント  付加指定
+
+\end{verbatim}
+
+
+
+
+
+
+
+\vspace{4cm}
+
+
+
+{\bf\flushleft (参考) サーバのマウント}
+
+  Qshシェルでは、サービス記録簿サーバント(\#s) を{\tt /srv}に
+フロッピーディスクサーバント(\#f) を{\tt /dev}に接続し、
+{\tt dossrv}サーバを機動してそのサーバリンク(パイプ)を{\tt /srv/dos} として登録し、
+そしてそのサービスリンクを{\tt /tmp}にマウントしている。
+この模様をを以下に示す。
+
+{\small
+\begin{verbatim}
+   << Qsh shell が dossrv を/tmpにマウントする模様 >>
+     bind  #s /srv     
+         →   /srv がサーバ登録簿となる
+
+     bind  -a #f  /dev   
+         →   /dev にフロッピーがバインドされる。
+             これにより、 /dev/fd0ctl,  /dev/ctl が見えるようになる。
+
+     dossrv    
+        →  dossrv (DOSファイルサーバ) は、起動されるとパイプを生成し/srv に登録する。
+           これにより /srv/dos が作られる。
+
+     mount -a  /srv/dos  /tmp   /dev/fd0disk
+        →  DOSファイルサーバ (/srv/dos)を /tmp ディレクトリにマウントする。
+           DOSファイルサーバは、フロッピー (/dev/fd0disk)にアクセスする。
+           これにより、 /tmp はフロッピーのファイルシスムをアクセスするようになる。
+\end{verbatim}
+}
+
+
+%%%%
+\section{マウントサーバント devmnt.c の内容}
+
+サーバをマウントして Remote Procedure Call を行っているのが
+``{\tt mnt}''サーバント (\#m) である。
+ソースコードは{\tt src/9/port/devmnt.c} である。 
+このプログラムの実装はかなり複雑であるが面白いので、ぜひ解読されたい。
+
+
+{\bf\flushleft (1) システムコールから9Pメッセージへの変換}
+
+サーバに対するシステムコールは{\tt devmnt.c} に伝えられて、
+そこで 9Pメッセージに変換される。
+(Cf. {\tt libc}ライブラリの {\tt convS2M(), convM2S()} )。
+
+{\tt devmnt.c}の関数呼び出しと9Pメッセージの関係を
+図\ref{fig:syscall-9pmsg}に示す。
+\\
+
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/syscall-9pmsg.eps}
+    \caption{9Pメッセージへの変換}
+    \label{fig:syscall-9pmsg}
+  \end{center}
+\end{figure}
+
+
+
+{\bf\flushleft (2) サーバのマウント}
+
+  サーバ''{\tt sss}'' のサーバリンクが、
+サービス記録簿に ({\tt /srv/sss}) として登録されているものとする。
+サーバの部分ファイルトリー``{\tt /b}'' をプロセスの{\tt /m/n}
+にマウントするものとする。
+
+\begin{verbatim}
+     mount -a  /srv/sss  /m/n   /b
+        →  sssサーバ (/srv/sss)の部分空間 /b を /m/n にマウントする。
+\end{verbatim}
+
+
+これにより、
+サーバの{\tt /b}以下の部分ファイルトリーが
+プロセスの{\tt /m/n}にマウントされ、
+サーバ上のファイルが見えるようになる。
+\\
+
+{\bf\flushleft (3) devmntのデータ構造}
+
+
+サーバアクセスに関するデータ構造を図\ref{fig:devmnt}に示す。
+
+\begin{figure}[hbt]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/devmnt.eps}
+    \caption{Mntサーバント devmnt.c のデータ構造}
+    \label{fig:devmnt}
+  \end{center}
+\end{figure}
+
+
+この図の各テーブルは、以下の意味を持つ。
+\begin{description}
+\item[・Chan(SvrLink)] 
+  サーバリンクを表すハンドル ({\tt Chan}テーブル)。
+  サーバリンクが pipe か　TCPコネクションかにより、
+  {\tt Chan.type}フィールドは pipeサーバント(\verb$#|$), 
+  あるいは　IPサーバント (\verb$#I$) をさしている。
+ 
+\item[・Mnt] 
+  サーバリンク上に複数の 9P メッセージを多重化するためのテーブル。
+
+\item[・Mntrpc] 
+  ここの9Pメッセージは{\tt Mntrpc}テーブルで表され、
+  {\tt Mnt}テーブルの待ち行列 {\tt Mnt.queue}に挿入される。
+
+\item[・Chan(/m/n)] 
+  サーバのマウントされるサブトリーの入り口点 {\tt /b}を表すハンドル。
+  サーバの{\tt /b} に対する{\bf 代理(Proxy)オブジェクト} として機能する。
+  {\tt Chan.type}フィールドは マウントサーバント(\#M)をさしている。
+
+\item[・Chan(/m/n/c/d)] 
+  サーバのサブトリーのオブジェクト ``{\tt c/d}''を表すハンドル。
+  サーバの``{\tt c/d}''に対する代理(Proxy)オブジェクトとして機能する。
+  {\tt Chan.type}フィールドは マウントサーバント(\#M)をさしている。
+
+\end{description}
+
+
+{\bf\flushleft (4) マウントの処理概要: mntattach()}
+
+  サーバのマウント処理の中核は、{\tt devmnt.c}の {\tt mntattach()}である。
+ {\tt sss}サーバ の部分空間{\tt /b}を {\tt /m/n} にマウントすると、
+以下のように処理が進む。
+
+
+\begin{enumerate}
+\item  
+   マウントにより、サーバリンクのハンドル{\tt Chan(SvrLink)}が割り付けられる。
+
+\item  
+    {\tt Chan(SvrLink)}は、多重化のためのテーブル{\tt Mnt}と結合される。
+
+\item
+   サーバ向け操作は9Pメッセージに変換されて{\tt Mntrpc}テーブルに登録される。
+
+\item  
+   {\tt Mntrpc}テーブルは {\tt Mnt}テーブルの{\tt queue}につながれて、
+   順次サーバに送られ、返答メッセージがくるのを待つ。
+
+\item
+   サーバから正当な返答メッセージを受けたら、サーバのマウント始点を
+   表すハンドル{\tt Chan(/m/n)}を割り当て、{\tt Chan(SvrLink)}にリンクする。
+   {\tt Chan(/m/n)}は代行(Proxy)オブジェクトであり、
+   {\tt Chan(/m/n)}に対する操作は9Pメッセージに変換されてRPCが行われる。
+
+\end{enumerate}
+
+
+
+{\bf\flushleft (5) open()の処理概要: mntopen(), mntwalk()}
+
+  サーバファイルのopen処理の中核は、{\tt devmnt.c}の 
+{\tt mntopen(), mntwalk()}である。
+
+次に、現在{\tt /m/n} にいて{\tt open("c/d",,,)}した場合のデータ構造を説明する。
+以下のように処理が進む。
+
+\begin{enumerate}
+\item  
+   まず、{\tt "c/d"} に行くために、
+    9Pメッセージ{\tt Twalk (,, {"c", "d"} ,,,)} がサーバに送られる。
+
+\item
+   サーバから正当な返答メッセージを受けたら、サーバの{\tt マウント始点``/b''}
+   表すハンドル{\tt Chan(/m/n/c/d)}を割り当て、{\tt Chan(SvrLink)}にリンクする。
+   {\tt Chan(/m/n/c/d)}は代行(Proxy)オブジェクトであり、
+   {\tt Chan(/m/n/c/d)}に対する操作は9Pメッセージに変換されて
+   Remote Procedure Call が行われる。
+   
+\end{enumerate}
+
+
+
+{\bf\flushleft (6) 多重処理の仕組み}
+
+
+○  Explanation: to be added.
+
+
+\vspace{5cm}
+
+
+
+
+
+\section{サーバ記録簿サーバント devsrv.c の内容}
+
+{\bf\flushleft (1) サーバリンクの登録法}
+
+サーバ記録簿サーバントは {\tt /srv}に接続されている。
+
+一般にサーバは、立ち上がり時にサーバリンクとして pipe を生成する
+(LP49の pipe は、両方向である)。
+その一方をサーバにつなぎ、他方を \verb|/srv/<ServerName>|として
+サーバ記録簿サーバントに登録する。
+
+
+たとえば、あるサーバが ``{\tt /srv/abc}''としてサーバ登録簿に
+登録する場合の手順は以下のようになる。
+
+{\small
+\begin{verbatim}
+    int  pipefd[2];
+    int  fd;
+    char buf[20]; 
+      :
+    pipe(pipefd);  //パイプを生成する
+      :
+    fd = create("/srv/abc", OWRITE|ORCLOSE, 0666); // "/srv/abc"を生成
+    sprint(buf, "%d", pipefd[1]);  
+    write(fd, buf, strlen(buf));  // "/srv/abc"に fd を書き込む
+      :
+    サーバは pipefd[0] にて9pメッセージの読み書きを行う
+      :
+\end{verbatim}
+}
+
+クライアントが、このサーバを ``{\tt /mnt/abc}''にマウントするには
+以下のコマンドによる。
+\begin{verbatim}
+    mount フラッグ /srv/abc  /mnt/abc  付加指定
+\end{verbatim}
+
+
+
+{\bf\flushleft (2) devsrv.c の内容}
+
+サーバ登録で``{\tt /srv/abc}''ファイルに``fd''を書き込むと、
+以下の処理を行う{\tt devsrv.c}の{\tt srvwrite()}が呼ばれる。
+
+\begin{verbatim}
+    Chan  *c1;
+    Srv   *sp;
+      :
+    c1 = fdtochan(fd, -1, 0, 1);  // fd で指定されたChanテーブル
+      :
+    sp = srvlookup(....);  // spは "/srv/abc" を指す
+      :
+    sp->chan = c1;  // "/srv/abc" にfd で指定されたChanテーブルをつなぐ
+      :
+\end{verbatim}
+
+この仕組みにより、サービス登録簿からサーバリンクが求まる。
+
+
+\subsection{サーバアクセス処理の具体例}
+
+ サーバの``{\tt /}'' をプロセスの名前空間``{\tt /c}''にマウントし、
+``{\tt /c}'' 及び ``{\tt /c/x/y}''  にアクセスした場合の処理内容を
+図\ref{fig:RemoteAccess}に示す。
+
+\begin{figure}[tb]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{fig/RemoteAccess2.eps}
+    \caption{リモートオブジェクトアクセス}
+    \label{fig:RemoteAccess}
+  \end{center}
+\end{figure}
+
+
+\begin{enumerate}
+\item サーバ登録簿への登録:  
+  サーバ登録簿にサーバリンクを登録することにより、
+  ``{\tt objH\{サーバリンク\}}'' (図の$\sigma$)が割り当てられる。
+
+\item サーバのマウント: 
+   {\tt mount}コマンドによりサーバをマウントする。\\
+   \verb| LP49[/]: mount  -ac  /srv/dos  /c  /dev/sdC0/dos|
+
+   {\tt /srv/dos}はサーバリンクを,
+   {\tt /c }はマウントポイントを,
+   {\tt /dev/sdC0/dos} はサーバ名前空間のマウント開始位置を、
+   {\tt -ac}は書き込み可能でafterにマウントすることを意味する。  
+
+  これにより、サーバとの間で{\tt attach}メッセージなどのやり取りを行い、
+  ``{\tt objH\{/c\}}'' (図の$\gamma$)テーブルを割り当て、以下の設定を行う。
+  \begin{itemize}
+    \item  typeフィールドには Mntサーバントを設定。
+          つまり、objH\{/c\}のクラスをMntサーバントである。
+    \item  mchanフィールドには {\tt objH\{サーバリンク\}}を設定。
+    \item  qidフィールドには サーバからもらった{\tt qid}を設定。
+          この{\tt qid}は、サーバ内のマウント開始位置オブジェクトの{\tt qid}である。
+  \end{itemize}
+  
+    以上により、{\tt objH\{/c\}}は、サーバ内のマウント開始位置オブジェクト(図の$\alpha$)
+    の{\bf Proxyオブジェクト}となる。
+    こうして、{\tt objH\{/c\}}への操作はマウントサーバントによって
+    {\bf 9P メッセージ}に変換され、サーバリンクに送り出される。
+   サーバからの返答を受けたらそれをクライアントに返す。
+
+\item サーバ名前空間での操作:  
+   例えば {\tt /c} にて``{\tt open(``x/y'', OREAD)}'' を実行したとする。
+   この場合は、サーバとの間で {\tt walk, open}メッセージなどをやり取りして、
+   ``{\tt objH\{/c/x/y\}}'' (図の$\delta$)テーブルを割り当て、以下の設定を行う。
+  \begin{itemize}
+    \item  typeフィールドには マウントサーバントを設定。
+    \item  mchanフィールドには {\tt objH\{サーバリンク\}}を設定
+    \item  qidフィールドには サーバからもらった{\tt qid}を設定。
+       この{\tt qid}は、サーバ内の{\tt /b/c/d}オブジェクト(図の$\beta$)の{\tt qid}である。
+  \end{itemize}
+
+    以上の設定により、{\tt objH\{/c/x/y\}}は、サーバ内の{\tt /x/y}オブジェクト
+    の Proxyオブジェクトとなる。
+
+\end{enumerate}
+
+
+
+
+
+
+
+
+\begin{comment}
+\section{サーバアクセス処理のまとめ}
+
+ サーバの``{\tt /b}'' をプロセスの名前空間``{\tt /m/n}''にマウントし、
+{\tt /m/n} 及び {\tt /m/n/c/d}  にアクセスした場合のデータ構造を
+図\ref{fig:RemoteAccess}に示す。
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/RemoteAccess.eps}
+    \caption{リモートオブジェクトアクセス}
+    \label{fig:RemoteAccess}
+  \end{center}
+\end{figure}
+
+
+  LP49-CORRE内では、以下のように処理されている。
+なお、``{\tt Chan(オブジェクト)}'' は、``オブジェクト''を指す``{\tt Chan}''テーブルを意味する。
+つまり、{\tt Chan.type} フィールドは そのオブジェクトのサーバント識別番号、 
+{\tt Chan.qid} フィールドはそのオブジェクトのサーバント内でユニークな識別子が入っている。
+
+
+\begin{quote}
+  【Remind】\\
+  {\tt Chan}テーブルはオブジェクトのハンドルであり、
+  {\tt Chan.type} フィールドはオブジェクトのクラスを、 
+  {\tt Chan.qid} フィールドはオブジェクトのインスタンスを指している。
+\end{quote}
+
+
+\begin{enumerate}
+\item  サーバ登録簿への登録 \\
+  サーバリンクをサーバ登録に登録することにより、``{\tt Chan(サーバリンク)}''が記録される。
+
+\item  サーバのマウント\\
+   サーバのマウントは、以下の{\tt mount()}システムコールが行う.\\
+   \verb|int mount(int fd, int afd, char* mountpoint, int flag, char *aname)| \\
+   {\tt fd}はサーバリンクのfile descriptor,
+   {\tt afd} は認証用でここでは{\tt -1} (認証不用) 、
+   {\tt mountpoint}はマウントポイント,
+   {\tt aname} はサーバ名前空間のマウント開始位置を意味する。\\
+  これにより、サーバとの間で{\tt attach}メッセージなどのやり取りを行い、
+  全て正当だったら、
+  ``{\tt Chan(m/n)}'' テーブルを割り当て、以下の設定を行う。
+  \begin{itemize}
+    \item Chan.type フィールドには Mntサーバント (devmnt.c) の識別番号を設定。
+          つまり、  Chan(m/n)のクラスをMntサーバントとする。
+    \item Chan.mchan フィールドには {\tt Chan(サーバリンク)}を設定
+    \item Chan.qid フィールドには サーバからもらった{\tt qid}を設定。
+          この{\tt qid}は、サーバ内のマウント開始位置オブジェクトの{\tt qid}である。
+  \end{itemize}
+  
+    以上の設定により、{\tt Chan(m/n)}は、サーバ内のマウント開始位置オブジェクト
+    の{\bf 代行(Proxy)オブジェクト}となる。\\
+    こうして、{\tt Chan(m/n)}への操作は、 
+    Mntサーバント (devmnt.c) の呼び出しとなる。
+    Mntサーバントは、要求を {\bf 9P メッセージ}に変換してサーバリンクに送り出し、
+   サーバからの返答を受けたら、それをクライアントに返す。
+
+
+\item  サーバ名前空間での change directory \\
+   例えば {\tt /m/n} から Change directory ``{\tt cd c/d}'' したとする。
+   この場合は、 サーバとの間で {\tt walk}メッセージなどをやり取りして、
+   全てが正当だったら、
+   ``{\tt Chan(m/n/a/b)}'' テーブルを割り当て、以下の設定を行う。
+  \begin{itemize}
+    \item Chan.type フィールドには Mntサーバント (devmnt.c) の識別番号を設定。
+    \item Chan.mchan フィールドには {\tt Chan(サーバリンク)}を設定
+    \item Chan.qid フィールドには サーバからもらった{\tt qid}を設定。
+          この{\tt qid}は、サーバ内の{\tt /b/c/d}オブジェクトの{\tt qid}である。
+  \end{itemize}
+
+    以上の設定により、{\tt Chan(m/n/c/d)}は、サーバ内の{\tt /b/c/d}オブジェクト
+    の{\bf 代行(Proxy)オブジェクト}となる。\\
+
+\end{enumerate}
+\end{comment}
+
+\section{リモートサーバの接続法}
+
+{\bf\flushleft (1) announce, listen, accept ライブラリ関数}
+
+○  Explanation: To be added.
+
+\vspace{4cm}
+
+
+{\bf\flushleft (2) listen1 コマンド}
+
+○  Explanation: To be added.
+
+\vspace{4cm}
+
+
+{\bf\flushleft (3) srv コマンド}
+
+○  Explanation: To be added.
+
+\vspace{4cm}
+
+
+
+
+%%%%%%
+\chapter{サーバ接続の管理}
+%%%%%%
+サーバは、DOSファイルサーバ、 Ext2ファイルサーバの様に永続的に立ち上げておくものと、
+Extfsサーバの様に接続要求対応に立ち上げるものとがある。
+後者は Unixでいえば ``{\tt inetd}''によって起動されるプログラムに対応する。
+LP49 では、``{\tt inetd}'' に似た役目をするのは 　``{\tt listen1, listen}'' である。
+
+
+\section{永続的サーバの立ち上げ時の処理}
+
+永続的サーバをクライアントに見えるようにするには、以下のいずれかによる。
+\begin{itemize}
+\item   サーバをサーバ登録簿に登録し、クライアントがマウントする。
+\item   サーバがプロセスの名前空間にマウントする。
+\item   ネットワーク上にannounceして接続要求がくるのを待つ。
+\end{itemize}
+
+
+{\bf\flushleft  (1) サーバ登録簿への登録}
+
+DOSファイルサーバなど永続的サーバは、立ち上がり時にサーバ登録簿に自分のサーバリンクを登録する。
+例えばDOSファイルサーバの ``{\tt /srv/dos)''には、サーバリンク情報が記録されている。
+クライアントは、これを用いてサーバを自分の名前空間にマウントする。
+
+永続的サーバのアウトラインを以下に示す。
+ローカル使用が主体のサーバの場合には、マウントまで行うものもある。
+
+{\bf Plan9 では、サーバ初期化プロセスが新しいプロセスを RFNOWAIT付きで rfork()し,
+実際のサービスは新プロセスに行わせている。
+そして、サーバ初期化プロセスはexit() している。
+つまり新プロセスがバックグラウンドで動作し、親プロセスはすぐに消えている。
+
+LP49 では、サーバ初期化プロセスがそのまま継続してサービスを提供する。
+このためにサーバプロセスをBackgraoud プロセスとして起動することとする。
+}
+
+{\small
+\begin{verbatim}
+【サーバ登録簿に登録するサーバ】 
+    void main(...)
+    {
+        int  pipefd[2];
+          :
+        pipe(pipefd);
+          :
+        // 以下の様に pipefd[1]　をサーバ登録簿に登録
+        fd = create("/srv/サーバ名" ...); // 
+        fprint(fd, "%d", pipefd[1]);
+          :
+          :
+        srvloop(pipefd[0]);   // pipefd[1] はサーバが読み書きする。
+    }
+   
+    void srvloop(int  fd)
+    {
+        for(;;){ 
+            n = read9pmsg(fd, ...);    // 9P メッセージを受ける
+            if (n , 0) break;
+              :
+            convM2S(...);   // 9Pメッセージを内部コードに展開する
+              :
+            (*fcalls[req->type])();  // メッセージに対応したメソッドを実行する
+              :
+            convS2M(...);   // 内部コードを 9Pメッセージに変換する 
+              :
+            write(fd, ....);  // 返答メッセージを送り出す
+        }
+    }
+
+  
+\end{verbatim}
+}
+
+
+{\bf\flushleft  (2) プロセス名前空間へのマウント}
+
+サーバが自分でマウントまで行う場合のプログラムである。
+{\tt mount()}コールはサーバリンクを介してサーバとの間で{\tt attach}メッセージの交信を行うので、
+両者は別のスレッドでなければならない。
+そこで、サーバスレッドを生成することが必要となる。
+
+{\small
+\begin{verbatim}
+【サーバ登録簿に登録するサーバ】 
+    void main(...)
+    {
+        int  pipefd[2];
+          :
+        pipe(pipefd);
+          :
+        // 以下の様に pipefd[1]　をサーバ登録簿に登録
+        fd = create("/srv/サーバ名" ...); // 
+        fprint(fd, "%d", pipefd[1]);
+          :
+        // srvloop() を実行するスレッドを生成する
+        l4thread_create(srvloop, ,,);  // pipefd[0]が9Pメッセージの受け口
+
+        mount(fd, -1, マウントポイント,,,);
+          :
+        sleep(...);  
+    }
+   
+    void srvloop(int  fd)
+    {
+        for(;;){ 
+            n = read9pmsg(fd, ...);    // 9P メッセージを受ける
+            if (n , 0) break;
+              :
+            convM2S(...);   // 9Pメッセージを内部コードに展開する
+              :
+            (*fcalls[req->type])();  // メッセージに対応したメソッドを実行する
+              :
+            convS2M(...);   // 内部コードを 9Pメッセージに変換する 
+              :
+            write(fd, ....);  // 返答メッセージを送り出す
+        }
+    }
+
+
+\end{verbatim}
+}
+
+
+\vspace{4cm}
+
+
+
+{\bf\flushleft  (3) ネットワーク上のannounce, listen}
+
+{\small
+\begin{verbatim}
+
+\end{verbatim}
+}
+
+
+
+\vspace{4cm}
+
+{\bf\flushleft  (4) lib9p の \verb|postmountsrv_l4()| と\verb|listensrv_l4()| }
+
+\vspace{4cm}
+
+
+
+\section{オンデマンドサーバの立ち上げ時の処理}
+%% {\bf\flushleft  (1) サーバ登録とマウント}
+
+Extfsサーバなどオンデマンドサーバは、
+{\tt listen1} コマンド (次項で説明) で指定しておくことにより、
+接続要求が来たときにサーバが立ち上がる。
+従って、サーバ登録簿には登録する必要がない。
+
+{\tt listen1} コマンド は、指定ポート番号を監視していて、
+接続要求が来たらTCP接続 (サーバリンク) を確立して、
+その fd をサーバに引き継ぐ。
+
+オンデマンドサーバのアウトラインを以下に示す。
+
+
+
+{\small
+\begin{verbatim}
+【オンデマンドサーバのスタート処理概要】 
+    int  netfd;  // listen1 コマンドが netfd に NW接続（サーバリンク）のfdを設定する。
+
+    void  main(...)
+    {
+          ;
+          ;
+        for(;;){ 
+            n = read9pmsg(netfd, ...);    // 9P メッセージを受ける
+            if (n , 0) break;
+              :
+            convM2S(...);   // 9Pメッセージを内部コードに展開する
+              :
+            (*fcalls[req->type])();  // メッセージに対応したメソッドを実行する
+              :
+            convS2M(...);   // 内部コードを 9Pメッセージに変換する 
+              :
+            write(netfd, ....);  // 返答メッセージを送り出す
+        }
+    }
+  
+\end{verbatim}
+}
+
+
+
+
+
+%%%%%%
+\section{サーバ要求の待ち受け}
+{\bf\flushleft  (1) listen1 コマンド}
+
+{\small
+\begin{verbatim}
+
+    char data[60], dir[40], ndir[40];  //%
+    char *progname;   //%
+
+    void main(int argc, char **argv)
+    {
+        int ctl, nctl, fd;
+        int  rc; //%
+
+          :
+          :
+        ctl = announce(argv[0], dir);  //ポート番号を公知にする
+          :
+
+        for(;;){
+            nctl = listen(dir, ndir);  //接続要求がくるのを待つ
+            switch(rfork(RFFDG|RFPROC|RFNOWAIT|RFENVG|RFNAMEG|RFNOTEG)){
+            case -1:
+                reject(nctl, ndir, "host overloaded");
+                close(nctl);
+                continue;
+
+            case 0: 
+                fd = accept(nctl, ndir);  //接続要求を受け付ける
+                     :
+                fprint(nctl, "keepalive");
+                close(ctl);
+                close(nctl);
+                sprint(data, "%s/data", ndir);
+                rc = bind(data, "/dev/cons", MREPL);   //% original is MREPL
+                dup(fd, 0);
+                dup(fd, 1);
+                dup(fd, 2);
+                close(fd);
+                exec(argv[1], argv+1);  // 指定されたサーバを実行する
+                fprint(2, "exec: %r");
+                exits(nil);
+
+            default:
+                sleep(10000); //%% ? Festina Lente
+                break;
+           }
+       }
+    }
+
+
+\end{verbatim}
+}
+
+
+
+
+{\bf\flushleft  (2) listen コマンド}
+
+\vspace{4cm}
+
+
+
+%%%%%%                                                                                                                
+\section{動的なサーバ接続要求}
+{\bf\flushleft  (1) srv コマンド}
+
+{\tt src/cmd/simple/srv.c}
+
+
+{\small
+\begin{verbatim}
+void main(int argc, char *argv[])
+    {
+        int  srvfd, fd;
+          :
+          :
+        dest = netmkaddr(dest, 0, "564");
+        srvfd = dial(dest, 0, dir, 0);  //目的ノードの目的ポートに接続する
+          :
+        fd = create("/srv/サーバ名", OWRITE, 0666);
+        sprint(buf, "%d", fd);
+        write(fd, buf, strlen(buf));    //サーバ登録簿にサーバリンクを登録
+          :
+        if (マウントポイントの指定あり）{
+             mount(fd, -1, マウントポイント, mountflag, "")
+               :
+        }
+        :
+        exits(0);
+    }
+
+\end{verbatim}
+}
+
+
+
+
+%%%%%
+\chapter{デバイスドライバ}
+
+\subsubsection{(1) ソースプログラム}
+
+    デバイスドライバのソースプログラムは、{\tt src/9/pc/*} にあるので、参照されたい。
+また、ドキュメント
+        \verb|LP49-yymmdd/doc/Programming/DEV_PROG.txt|
+   を参照されたい。
+
+\begin{description}
+\item[sdata.c]          ハードディスクドライバ
+\item[devfloppy.c]      フロッピードライバを含む
+\item[etherxxx.c]       Ether card のドライバ
+\item[usbuhcs.c]        USBホストコントローラ
+\end{description}
+
+
+\subsubsection{(2) 割込みハンドラ}
+
+{\bf\flushleft  (a) ソースコード}
+
+       \verb|src/libl4com/l4-p9-irq.c|
+    
+
+{\bf\flushleft  (b) 割込みハンドラ登録関数}
+
+\begin{verbatim}
+   void p9_register_irq_handler(int irq, void (*func)(void*, void*),void* arg, char *name);
+   void  intrenable(int irq, void (*f)(void*, void*), void* a, int tbdf, char *name);
+   void p9_unregister_irq_handler(int irq);
+   int intrdisable(int irq, void (*f)(void *, void *), void *a, int tbdf, char *name);
+\end{verbatim}
+    
+{\bf\flushleft (c 割込みハンドラ登録の例}
+
+\begin{verbatim}
+   devether.c:448: 
+     intrenable(ether->_isaconf.irq, ether->interrupt, ether, ether->tbdf, name); 
+   devi82365.c:671: 
+     intrenable(cp->irq, i82365intr, 0, BUSUNKNOWN, buf);
+   devpccard.c:641: 
+     intrenable(pci->intl, cbinterrupt, cb, pci->tbdf, "cardbus");
+   devusb.c:470: 
+     intrenable(uh->_isaconf.irq, uh->interrupt, uh, uh->tbdf, name); 
+   kbd.c:534: 
+     intrenable(IrqAUX, i8042intr, 0, BUSUNKNOWN, "kbdaux"); //%
+   kbd.c:581: 
+     intrenable(IrqKBD, i8042intr, 0, BUSUNKNOWN, "kbd");  //%
+   main-l4.c:700: 
+     intrenable(IrqIRQ13, matherror, 0, BUSUNKNOWN, "matherror");
+   sdata.c:2189: 
+     intrenable(ctlr->irq, atainterrupt, ctlr, ctlr->tbdf, name);
+\end{verbatim}
+
+
+{\bf\flushleft (d) 割込み処理の手順}
+
+    (d-1) 割り込みハンドラ登録
+
+         Cf. 上記説明
+
+    (d-2) 割込みハンドラスレッドの生成
+
+\begin{verbatim}
+      main() -- in pc/main-l4.c 
+        :
+        p9_irq_init()    -- in src/libl4com/l4-p9-irq.c
+        :   ここで、割込みハンドラスレッドが生成される。
+        :
+\end{verbatim}
+
+    (d-3) 割込み時の処理の流れ
+\begin{verbatim}
+        デバイスが割込み発生
+               --> L4 マイクロカーネルが割込みを検知 
+                    --> 割込みメッセージを割込みハンドラスレッドに送る
+                             --> 割込みハンドかの実行
+\end{verbatim} 
+
+    
+%%%%
+\chapter{ 物理メモリアクセス}
+
+\begin{verbatim}
+    (1) 関連ソースコード
+
+        src/9/port/xalloc-l4.c
+        src/9/port/alloc.c
+    
+    (2) ヒープ域
+        (a) xalloc-l4.c includes:
+           #define  XMAP_LADDR     ...
+           #define  XMAP_PADDR     ...
+           #define  XMAP_LOG2SIZE  ...
+
+        (b) (2 ** XMAP_LOG2SIZE) bytes are reserved for the heap area.
+
+        (c) Heap area is linearly mapped to physucal memory, and 
+           logical-physical address translation is very simple.
+          <physical_addr> == <logical_addr> - XMAP_LADDR + XMAP_PADDR
+
+        (d) XMAP_LADDR, XMAP_PADDR  and XMAP_LOG2SIZE must satisfy 
+            the L4 Flex page constraint.    
+\end{verbatim}
+
+
+%%%%%
+\chapter{例外処理}
+
+      Plan9では、
+\begin{verbatim}
+    if (waserror()) {
+         ..... 
+       nexterror();
+    }   
+        ....  
+    poperror();
+\end{verbatim}
+の形式からなる技巧的な例外処理を開発している。
+
+これは、Java の構文『\verb|try{.......}catch(...){ .......}| 』に類似した例外処理を
+OS と C言語で実現しようというものである。
+実現の仕組み自体は、{\tt setjmp()/longjmp()} と類似している。
+
+しかしながら、以下の理由からLP49ではこの手法は採用せずに、例外が生じたら
+関数のリターン値として通知することにした。
+
+\begin{itemize}
+\item  例外が生じた場合の制御フローを追いにくく、プログラム論理がわかりにくい。
+\item  プロセス・スレッド単位に、複数レベルの例外ジャンプセーブ域を確保する必要があり、
+    スレッドの多用を目指 したLP49には適さない。
+\end{itemize}
+
+
+
+\newpage
+\part{ライブラリー}
+
+\chapter{ライブラリー}
+
+\section{各ライブラリの概要}
+
+{\bf\flushleft  (1) libl4com、libl4io} 
+
+    L4マイクロカーネルの機能を使うためのライブラリ関数を含む。要リファイン。
+    libl4io は、 LP49のプリント機能が実装される前にプリントをするために作ったものである。
+\\
+
+{\bf\flushleft  (2) libc}
+
+  libc は、UNIX/Linux の libc相当のライブラリ関数を含んでいる。
+  LP49のシステムコールに対応するライブラリ関数の場合は、
+パケットを編集してL4のメッセージとして CORE層に送信し、返答メッセージを待つ。
+
+{\small
+\begin{verbatim}
+  INLINE int syscall_iaiiim(int syscallnr, int arg0, void* arg1, int arg2, int arg3, int arg4,
+                            L4_MapItem_t mapitem)
+  {
+      L4_Msg_t     msgreg;
+      L4_MsgTag_t  tag;
+      int          result;
+      unsigned     patrn = 0x411121; //  pattern("iaiiim");
+
+      L4_MsgClear(&msgreg);
+      L4_Set_MsgLabel(&msgreg, syscallnr);
+      L4_MsgAppendWord(&msgreg, patrn);        
+      L4_MsgAppendWord(&msgreg, arg0);       //arg0 i
+      L4_MsgAppendWord(&msgreg, (int)arg1);  //arg1 a
+      L4_MsgAppendWord(&msgreg, arg2);       //arg2 i
+      L4_MsgAppendWord(&msgreg, arg3);       //arg3 i
+      L4_MsgAppendWord(&msgreg, arg4);       //arg4 i
+      L4_MsgAppendMapItem(&msgreg, mapitem);  //map
+  
+      L4_MsgLoad(&msgreg);
+      tag = L4_Call(SrvManager);
+      if (L4_IpcFailed(tag))  return -1; 
+  
+      L4_UnmapFpage(L4_MapItemSndFpage(mapitem)); 
+      L4_MsgStore(tag, &msgreg);
+      result = L4_MsgWord(&msgreg, 0); 
+      return result;
+  }
+  
+  long     pwrite(int fd, void* buf, long nbytes, vlong offset) // iaiii
+  {
+      union {
+        vlong   v;
+        ulong   u[2];
+      } uv;
+      uv.v = offset;   
+      L4_MapItem_t  map; 
+      map = covering_fpage_map(buf, nbytes, L4_Readable|L4_Writable);
+      return syscall_iaiiim(PWRITE, fd, buf, nbytes, uv.u[0], uv.u[1], map);  
+  }
+\end{verbatim}
+}
+
+
+{\bf\flushleft  (3) libbio}\\
+
+  
+{\bf\flushleft  (4) libdbg}\\
+
+  
+{\bf\flushleft  (5) lib9p}\\
+
+
+\newpage
+\part{Initプロセスとシェル}
+
+%%%%
+\chapter{initプロセス}
+
+LP49coreが立ち上がると、ついで{\tt init}プロセスが立ち上がる。
+
+{\tt init}プロセスは、以下のように名前空間を設定した上で
+{\tt qsh}シェル、もしくは{\tt rc}シェル を {\tt fork()} する。
+{\tt init}プロセスは、途中で \\
+　\verb|     Which shell ?  rc: hit 'r' RETURN;  qsh: RETURN| \\
+と聞いてくるので、{\tt qsh}シェルの場合は Return、
+{\tt rc}シェルの場合は {\tt r}を押して Return を打鍵する。
+
+{\tt rc}シェルは、現在実装中なので部分的に動作する。
+
+\begin{enumerate}
+\item  コンソールサーバントを接続する
+\item  \verb|open(/dev/cons)|をして、
+       STDIN, STDOUT, STDDERRを開く。
+
+\item  FDサーバントを接続する
+\item  環境変数サーバントを接続する
+\item  PROCサーバントを接続する
+\item  サービス記録サーバントを接続する
+\item  ルートFSサーバントを接続する
+\item  ......
+\item  ISO9660(CD)サーバをマウントする
+
+\item  ``{\tt /t/bin}''を ``{\tt /bin}'' に接続する。
+
+\item  シェルを {\tt fork()} する。
+
+\end{enumerate}
+
+
+
+\vspace{4cm}
+
+    
+    
+
+    
+
+    
+\chapter{qsh: デバッグ用簡易シェル}
+
+   qsh は、LP49のデバッグのために作った疑似 (quasi) シェルである。
+    
+ qsh シェルは、LP49 のデバッグのために作った(dirtyな) 簡易シェルである。
+
+このため、{\tt create(), open(), read(), write(),,,}など
+多くのシステムコールを組み込みコマンドで試すことができるようになっている。
+
+組み込みコマンドの使用については、別資料
+``{\tt LP49の利用説明書}''を参照されたい。
+
+    
+    
+\chapter{rc: Plan9 の高機能シェル}
+
+  "rc" は、Plan9から移植した高機能シェルであり、現在開発途上である。
+
+バイナリコードは {\tt /t/bin/rc} である。
+qsh のなかからも、以下のように起動できる。
+   
+\begin{verbatim}
+       LP49[/]: cd /t/bin
+       LP49[/t/bin]: rc 
+\end{verbatim}
+
+
+
+To be explained.
+
+
+
+%%%%%%%%%    
+\part{サーバ}
+
+\chapter{代表的なサーバー}
+{\bf\flushleft  (1) RAMFSサーバー  (src/cmd/simple/ramfs.c)}\\
+
+    ストレッジメディアとして RAM を使ったシングルスレッドのファイルサーバーである。
+簡単なので、サーバの作り方の勉強にも役立とう。
+  \\
+
+{\bf\flushleft  (2) DOSサーバー (src/cmd/dosfs/*)}\\
+
+    DOSファイルシステムをサポートするサーバである。 
+LP49 ブートフロッピーは DOSファイルであり、ブートフロッピーに載っている
+コマンドをすぐに使えるように、本サーバは LP49 のブート時に立ち上がっている。
+  \\
+
+{\bf\flushleft  (3) EXT2サーバー (src/cmd/ext2fs/*)}\\
+
+    Linuxの標準ファイルシステムである EXT2 ファイルシステムをサポートするサーバ。
+   \\
+
+{\bf\flushleft  (4) 9660サーバー (src/cmd/9660fs/*)}\\
+
+    ISO 9660 のCD ファイルシステムをサポートするサーバ。
+   \\
+
+{\bf\flushleft  (5)ノード間連携: リソースの exportfs/import}\\
+
+      自分の名前空間 (Name directry) の部分空間を、外部ノードに見えるように(export)、
+あるいは外部ノードの部分空間を自分の所から見えるようにする(import)機能である。
+
+      〇 src/cmd/exportfs, src/cmd/import\\
+
+
+     〇自分の実行環境を相手に見えるようにする      \\
+
+     〇 exportされた環境をアクセスできる。  \\
+
+     〇例えば、terminal PC が CPU サーバに自分のリソースを見せて仕事をさせる。
+
+   \vspace{4cm}
+
+
+    
+    
+\bf\flushleft{(参考）QSHからのサーバの制御}
+
+\begin{verbatim}                                                                   
+  (1) ramfs     
+       〇 ramfs をスタートさせる。
+       〇 ramfs は、パイプ (Plan9 の pipe は両方向) を作る。
+                                                                 □----------*    
+                                                  [1]  pipe  [0] | ramfs    |     
+                                     /srv/ramfs   ⇔  〇 〇   ⇔ |          |     
+                                                                 | thread   |     
+                                                                 |          |     
+                                                                 *----------*     
+       〇パイプのサービス受け側を、/srv に登録する。→  /srv/ramfs が生成される。
+         プログラム上では /srv/ramfs を生成して、パイプの file descriptor番号を書き込む。
+              pipe(p);
+              .....
+              fd = create("#s/ramfs", OWRITE|ORCLOSE, 0666);
+              sprint(buf, "%d", p[1]);
+              write(fd, buf, strlrn(buf));
+           →  /srv/ramfs の本当の中身は、 このパイプを指す channel構造体。
+       〇勿論、離れたマシン間では パイプの代わりに ネットワーク接続を使う。
+
+  (2) mount -c /srv/ramfs /tmp "" 
+
+        〇 /tmp に /srv/ramfs のルートディレクトリ ("") をマウントする。
+    
+        〇 APL が /tmp/* にアクセスすると、自動的に 9P protocol に変換され、パイプ経由で
+           ramfs がアクセスされる。
+    
+  (3) create -w /tmp/zzz 0777
+      〇 /tmp(つまり ramfs)上に zzzファイルを、writable(-w), permisson=0777 で生成する。
+      〇 OS は , /tmp/zzz の file descriptor を返す。 ここでは 3 とする。
+    
+  (4) write 3 $sl
+      〇 $sl は、SL を描いた QSH内のファイル   
+      〇 /tmp/zzz に SLの絵が書き込まれる。
+      〇 file position が進む。
+  (5) pread 3 0
+     〇 先頭番地から内容が読み出される。
+\end{verbatim}          
+
+
+\chapter{u9fsサーバ: Linuxのファイルシステムをマウントする}
+
+\vspace{4cm}
+
+
+%%%%%
+
+
+%%%%
+\chapter{サーバプログラムの作り方}
+
+\section{Ramfs2 サーバのソースコード： src/cmd/lesson/ramfs2.c}
+
+サーバの共通処理は ``{\tt lib9p}''ライブラリが用意しているので、
+サーバは簡単に作ることができる。
+
+以下は、RAMを記録媒体とするファールサーバである。
+これは、配布ファイルの {\tt LP49-yymmdd/src/cmd/lesson/ramfs2.c} である。
+
+
+{\footnotesize
+\begin{verbatim}
+【src/cmd/lesson/ramfs2.cのソース】
+    #include <u.h>
+    #include <libc.h>
+    #include <auth.h>
+    #include <fcall.h>
+    #include <thread.h>
+    #include <9p.h>
+
+    static char Ebad[] = "something bad happened";
+    static char Enomem[] = "no memory";
+
+    typedef struct Ramfile	Ramfile;
+    struct Ramfile {
+        char *data;
+        int ndata;
+    };
+
+    void fsread(Req *r)
+    {
+        Ramfile *rf;
+        vlong offset;
+        long count;
+
+        rf = r->fid->file->aux;
+        offset = r->ifcall.offset;
+        count = r->ifcall.count;
+        if(offset >= rf->ndata){
+             r->ofcall.count = 0;
+             respond(r, nil);
+             return;
+        }
+        if(offset+count >= rf->ndata)
+            count = rf->ndata - offset;
+        memmove(r->ofcall.data, rf->data+offset, count);
+        r->ofcall.count = count;
+        respond(r, nil);
+    }
+
+    void fswrite(Req *r)
+    {
+        void *v;
+        Ramfile *rf;
+        vlong offset;
+        long count;
+
+        rf = r->fid->file->aux;
+        offset = r->ifcall.offset;
+        count = r->ifcall.count;
+        if(offset+count >= rf->ndata){
+            v = realloc(rf->data, offset+count);
+            if(v == nil){
+                 respond(r, Enomem);
+                 return;
+            }
+            rf->data = v;
+            rf->ndata = offset+count;
+            r->fid->file->_dir.length = rf->ndata;  //% _dir.
+        }
+        memmove(rf->data+offset, r->ifcall.data, count);
+        r->ofcall.count = count;
+        respond(r, nil);
+    }
+
+    void fscreate(Req *r)
+    {
+        Ramfile *rf;
+        File *f;
+
+        if(f = createfile(r->fid->file, r->ifcall.name, r->fid->uid, r->ifcall.perm, nil)){
+            rf = emalloc9p(sizeof *rf);
+            f->aux = rf;
+            r->fid->file = f;
+            r->ofcall.qid = f->_dir.qid;  //% _dir.
+            respond(r, nil);
+            return;
+        }
+        respond(r, Ebad);
+    }
+
+    void fsopen(Req *r)
+    {
+        Ramfile *rf;
+
+        rf = r->fid->file->aux;
+        if(rf && (r->ifcall.mode&OTRUNC)){
+            rf->ndata = 0;
+            r->fid->file->_dir.length = 0;   //% _dir.
+        }
+        respond(r, nil);
+    }
+
+    void fsdestroyfile(File *f)
+    {
+        Ramfile *rf;
+
+        rf = f->aux;
+        if(rf){
+            free(rf->data);
+            free(rf);
+        }
+    }
+
+    Srv fs = {
+        .open=  fsopen,
+        .read=  fsread,
+        .write= fswrite,
+        .create= fscreate,
+    };
+
+    void usage(void)
+    {
+        fprint(2, "usage: ramfs2 [-D] [-a address] [-s srvname] [-m mtpt]\n");
+        exits("usage");
+    }
+
+    void main(int argc, char **argv)
+    {
+        char *addr = nil;
+        char *srvname = nil;
+        char *mtpt = nil;
+        Qid q;
+
+        fs.tree = alloctree(nil, nil, DMDIR|0777, fsdestroyfile);
+        q = fs.tree->root->_dir.qid;  //% _dir.
+        ARGBEGIN{
+        case 'D':
+            chatty9p++;
+            break;
+        case 'a':
+            addr = EARGF(usage());
+            break;
+        case 's':
+            srvname = EARGF(usage());
+            break;
+        case 'm':
+            mtpt = EARGF(usage());
+            break;
+        default:
+            usage();
+        }ARGEND;
+
+        if(argc) usage();
+        if(chatty9p)
+            fprint(2, "ramsrv.nopipe:%d address:'%s' srvname:'%s' mtpt:'%s'\n", 
+                   fs.nopipe, addr, srvname, mtpt);
+        if(addr == nil && srvname == nil && mtpt == nil)
+            sysfatal("must specify -a, -s, or -m option");
+
+        // "-a addr" が指定された場合は、NWから接続要求を待つ
+        // listensrv_l4()の中でサービススレッドが生成される
+        if(addr)
+            listensrv_l4(&fs, addr);   //%
+
+        // "-s srvname" が指定された場合は/srvにサーバ登録をする
+        // "-m mountpoint" が指定された場合はマウントまで行う
+        // postmountsrv_l4()の中でサービススレッドが生成される
+        if(srvname || mtpt)
+            postmountsrv_l4(&fs, srvname, mtpt, MREPL|MCREATE); //%
+        final_l4();  //%  exits(0);
+    }
+
+\end{verbatim}
+}
+
+\section{ramfs2 の起動と利用}
+
+
+{\bf\flushleft  (1) サーバ登録の例}
+
+\begin{verbatim}
+    LP49[/]: /bin/ramfs2 -s ramfs2
+        -->  /srv/ramfs2 が作られる
+    LP49[/]: mount -a /srv/ramfs2  /mnt
+        -->  /mnt にマウントされる。
+\end{verbatim}
+
+\vspace{4cm}
+
+{\bf\flushleft  (2) マウントの例}
+
+\begin{verbatim}
+    LP49[/]: /bin/ramfs2 -m  /mnt
+        -->  /mnt にマウントされる。
+\end{verbatim}
+
+\vspace{4cm}
+
+{\bf\flushleft  (3) NW上に公開}
+
+\begin{verbatim}
+    LP49[/]: /bin/ramfs2 -a tcp!*!2345 
+        -->  ポート  2345 をアナウンスする。
+
+   ----- 別マシン -------　　
+    LP49[/]: /bin/srv2  tcp!10.0.0.2!2345 ramfs2
+        -->  /srv/ramfs2 が作られる
+    LP49[/]: mount -a /srv/ramfs2  /mnt
+        -->  /mnt にマウントされる。
+\end{verbatim}
+
+\vspace{4cm}
+
+
+
+%%%%%%%
+\chapter{Serverのための基本技術 }
+
+\section{多重処理の実現}
+
+{\bf\flushleft (1) 9Pプロトコルの多重化識別子}
+
+  サーバーは複数プロセスから同時に要求を受理する可能性がある。
+多重処理の実現法としては、一般に以下が考えられる。
+   
+\vspace{4cm}
+
+
+{\bf\flushleft (2) 多重処理}
+
+      サーバは。9Pプロトコルのメッセージを処理できるユーザモードのプロセスである。
+      9Pメッセージは TCP接続あるいは pipe を通して運ばれる。
+      サーバにつながれた TCP 接続および pipe をサーバリンクと呼ぶ。
+      サーバリンクは CORE層のサービス記録簿（{\tt /srv/*})に登録される。
+
+      クライアントはサーバ登録簿から目的サーバを見つけて自分の名前空間にマウントすることにより、
+      サーバの名前空間にアクセスできるようになる。
+      サーバは、複数のメッセージを並行して受ける可能性があり、大別して二つの作り方が考えられる。
+
+
+
+
+
+\section{多重処理の実現法}
+
+      サーバーは複数プロセスから同時に要求を受理する可能性がある。
+多重処理の実現法としては、一般に以下が考えられる。
+
+\begin{enumerate}
+\item  シングルスレッドによる逐次実行\\
+      同時には、一つのメッセージのみを処理する。
+      処理中に到着した次のメッセージは、前者が終わるまで待ち合わせされる。
+    .....
+    
+\item  シングルスレッドによる多重処理\\
+    ....    
+    
+\item  マルチスレッドによる多重処理\\
+      複数の並行要求を処理するために、複数ののスレッドを用意して，個々の要求を書誌する方式。
+      スレッドはスレッドプールから割り当てるなり、動的に生成するなりする。
+    .....
+    
+\item  プロセス生成\\
+     ....
+\end{enumerate}    
+
+
+\section{サーバのクライアントへの見せ方(その1 パイプ)}
+
+    §   Pipe を/srvに登録、マウント
+
+    ◎ Cf. src/lib9p/{srvmain-l4.c  srv.c  }   
+    ◎ 立ち上げ内容
+
+
+
+    【参考】Plan9オリジナル
+    ◎ Cf. src/lib9p/{rfork.c  post.c  srv.c  }   
+    ◎ 立ち上げ内容
+
+
+\section{サーバのクライアントへの見せ方(その2 TCP接続)}
+
+
+    §  Listen()してL4スレッド生成
+
+    ◎ Cf. src/lib9p/{srevmain-l4.c    , srv.c}   
+
+    ◎ 立ち上げ内容
+
+
+
+\part{今後の課題}
+\chapter{今後の課題}
+ 
+\section{進行中}
+
+\begin{itemize}
+  \item  rc シェルの完成 (進行中)
+  \item  rfork(), exec(), exits() の安定化
+  \item  exportfs/import の完成 
+  \item  exception handler の完成
+  \item  L4マルチスレッドライブラリのリファイン
+  \item  VGAドライバ (とりあえず qemuの -std-vga)                     
+  \item 資料化
+  \item 評価
+\end{itemize}
+
+
+\section{Wishリスト}
+
+\begin{itemize}
+  \item  USB 2.0
+  \item  USB ブート
+  \item  VGAサポート
+  \item  IBEを使った認証
+  \item  HTTPDなどの Plan9 コマンドの移植
+  \item メモリ割り付けのリファイン  (CORE層の malloc、libcの malloc) 
+  \item {\tt Pager} (src/9/hvm/mx-pager) の書き直し
+  \item プロセス制御機能を CORE層からHVM層に移す。
+  \item 難解プログラムの書き直し {\tt  chan.c, devmnt.c,,,}
+  \item  {\bf 関数型言語 Erlang による OS 記述}
+  \item 評価
+\end{itemize}
+
+
+\end{document}

@@ -1,0 +1,76 @@
+\contentsline {part}{第I部\hspace {1em}LP49の概要}{4}
+\contentsline {chapter}{\numberline {第1章}LP49開発の目的}{5}
+\contentsline {chapter}{\numberline {第2章}プログラム構成}{7}
+\contentsline {chapter}{\numberline {第3章}サービスと抽象ファイル}{9}
+\contentsline {section}{\numberline {3.1}サービス部品：　サーバントとサーバ}{9}
+\contentsline {section}{\numberline {3.2}抽象ファイルオブジェクト}{10}
+\contentsline {section}{\numberline {3.3}サーバント、サーバの名前空間の接続}{10}
+\contentsline {chapter}{\numberline {第4章}Plan9 と LP49 の主要な対比}{11}
+\contentsline {part}{第II部\hspace {1em}HVM階層}{13}
+\contentsline {chapter}{\numberline {第5章}LP49の立ち上げ}{14}
+\contentsline {chapter}{\numberline {第6章}Pager: ページフォルトの処理}{16}
+\contentsline {part}{第III部\hspace {1em}CORE階層}{19}
+\contentsline {chapter}{\numberline {第7章}CORE層の基本機能}{20}
+\contentsline {section}{\numberline {7.1}マルチスレッドサーバ}{20}
+\contentsline {section}{\numberline {7.2} プロセス管理のシステムコール処理}{20}
+\contentsline {section}{\numberline {7.3} ファイル系システムコール}{20}
+\contentsline {section}{\numberline {7.4} 名前空間の管理}{21}
+\contentsline {section}{\numberline {7.5}サーバント}{22}
+\contentsline {section}{\numberline {7.6}サーバとの連携の仕組み}{22}
+\contentsline {section}{\numberline {7.7}IPプロトコルスタック}{23}
+\contentsline {chapter}{\numberline {第8章}システムコールの受付と実行 syssrv-l4.c}{25}
+\contentsline {section}{\numberline {8.1}マルチスレッドサーバの実現法}{25}
+\contentsline {section}{\numberline {8.2}システムコールのパラメータ、データ引き継ぎ}{26}
+\contentsline {chapter}{\numberline {第9章}プロセス管理}{27}
+\contentsline {section}{\numberline {9.1}プロセス管理テーブル Proc (src/9/port/portdat.h)}{27}
+\contentsline {section}{\numberline {9.2}プロセス管理プログラム Proc (proc-l4.c, sysproc-l4.c in src/9/port/)}{27}
+\contentsline {chapter}{\numberline {第10章}抽象ファイル操作とサーバント}{28}
+\contentsline {section}{\numberline {10.1}オブジェクト指向としてのとらえ方}{28}
+\contentsline {section}{\numberline {10.2}Devテーブル Dev (src/9/port/portdat.h)}{29}
+\contentsline {section}{\numberline {10.3}オブジェクトハンドラ (Chan テーブル)}{29}
+\contentsline {section}{\numberline {10.4}サーバントの一般構造}{30}
+\contentsline {section}{\numberline {10.5}Servantはファイルシステムである}{33}
+\contentsline {section}{\numberline {10.6}代表的なサーバント}{34}
+\contentsline {chapter}{\numberline {第11章}名前空間の管理}{35}
+\contentsline {section}{\numberline {11.1}名前サーチ：パス名から目的オブジェクトを求める}{35}
+\contentsline {section}{\numberline {11.2}チャネルプログラム chan.c}{35}
+\contentsline {section}{\numberline {11.3}マウントの仕組み}{36}
+\contentsline {chapter}{\numberline {第12章}サーバ接続とマウントサーバント}{38}
+\contentsline {section}{\numberline {12.1}9P: サーバとの通信プロトコル}{38}
+\contentsline {section}{\numberline {12.2}サーバリンクとサーバ登録サーバント /srv }{39}
+\contentsline {section}{\numberline {12.3}マウントサーバント devmnt.c の内容}{40}
+\contentsline {section}{\numberline {12.4}サーバ記録簿サーバント devsrv.c の内容}{43}
+\contentsline {subsection}{\numberline {12.4.1}サーバアクセス処理の具体例}{44}
+\contentsline {section}{\numberline {12.5}リモートサーバの接続法}{45}
+\contentsline {chapter}{\numberline {第13章}サーバ接続の管理}{46}
+\contentsline {section}{\numberline {13.1}永続的サーバの立ち上げ時の処理}{46}
+\contentsline {section}{\numberline {13.2}オンデマンドサーバの立ち上げ時の処理}{48}
+\contentsline {section}{\numberline {13.3}サーバ要求の待ち受け}{49}
+\contentsline {section}{\numberline {13.4}動的なサーバ接続要求}{50}
+\contentsline {chapter}{\numberline {第14章}デバイスドライバ}{51}
+\contentsline {subsubsection}{(1) ソースプログラム}{51}
+\contentsline {subsubsection}{(2) 割込みハンドラ}{51}
+\contentsline {chapter}{\numberline {第15章} 物理メモリアクセス}{53}
+\contentsline {chapter}{\numberline {第16章}例外処理}{54}
+\contentsline {part}{第IV部\hspace {1em}ライブラリー}{55}
+\contentsline {chapter}{\numberline {第17章}ライブラリー}{56}
+\contentsline {section}{\numberline {17.1}各ライブラリの概要}{56}
+\contentsline {part}{第V部\hspace {1em}Initプロセスとシェル}{58}
+\contentsline {chapter}{\numberline {第18章}initプロセス}{59}
+\contentsline {chapter}{\numberline {第19章}qsh: デバッグ用簡易シェル}{60}
+\contentsline {chapter}{\numberline {第20章}rc: Plan9 の高機能シェル}{61}
+\contentsline {part}{第VI部\hspace {1em}サーバ}{62}
+\contentsline {chapter}{\numberline {第21章}代表的なサーバー}{63}
+\contentsline {chapter}{\numberline {第22章}u9fsサーバ: Linuxのファイルシステムをマウントする}{65}
+\contentsline {chapter}{\numberline {第23章}サーバプログラムの作り方}{66}
+\contentsline {section}{\numberline {23.1}Ramfs2 サーバのソースコード： src/cmd/lesson/ramfs2.c}{66}
+\contentsline {section}{\numberline {23.2}ramfs2 の起動と利用}{68}
+\contentsline {chapter}{\numberline {第24章}Serverのための基本技術 }{70}
+\contentsline {section}{\numberline {24.1}多重処理の実現}{70}
+\contentsline {section}{\numberline {24.2}多重処理の実現法}{70}
+\contentsline {section}{\numberline {24.3}サーバのクライアントへの見せ方(その1 パイプ)}{71}
+\contentsline {section}{\numberline {24.4}サーバのクライアントへの見せ方(その2 TCP接続)}{71}
+\contentsline {part}{第VII部\hspace {1em}今後の課題}{72}
+\contentsline {chapter}{\numberline {第25章}今後の課題}{73}
+\contentsline {section}{\numberline {25.1}進行中}{73}
+\contentsline {section}{\numberline {25.2}Wishリスト}{73}

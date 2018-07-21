@@ -1,0 +1,13 @@
+</$objtype/mkfile
+
+TARG =	usbsfs
+
+HFILES = scsireq.h ../lib/usb.h
+OFILES = scsireq.$O usbsfs.$O
+LIB=../lib/usb.a$O
+
+BIN=/$objtype/bin/usb
+
+</sys/src/cmd/mkone
+
+CFLAGS=-I../lib $CFLAGS

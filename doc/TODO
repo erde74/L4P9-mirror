@@ -1,0 +1,168 @@
+*****************************************************************
+*                                                               *
+*            o o   TO DO list  .. ... ... Wish list ...         *
+*        o 0                                                    *
+*       0     __     _________  _________  _________            *
+*     _[]----|##|__ | # # # # || # # # # || # # # # |           *
+*    ()______|__|__||_________||_________||_________|           *
+*    ##oo ()()() 0 0  ()   ()    ()   ()    ()  ()              *
+*  "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^         *
+*****************************************************************
+
++---------------------------------------------------------------+
+|      Working, but not complete                                |
++---------------------------------------------------------------+
+
+<<< Process management >>>
+  <> exits() 
+	port/sysproc-l4.c:  sysexits()  
+	port/proc-l4.c:  pexit()
+
+  <> spawn() 
+
+  <> fork() 
+
+  <> exec() >
+
+
+
+<<< RC shell >>>
+   /src/cmd/rc
+   pipe
+
+
+<<< Boot process: init >>>
+   /src/9/init/init_.c 
+
+  #### Current version ###############
+  title = LP49: CD BOOT (Hvm + Pc + Qsh + DosSrv + 9660Srv)
+  kernel=/l4/kickstart-0804.gz
+  module=/l4/l4ka-0804.gz
+  module=/l4/sigma0-0804.gz
+  module=/boot/hvm.gz
+  module=/boot/pc.gz
+  module=/boot/qsh.gz
+  module=/boot/dossrv.gz
+  module=/bin/9660srv
+
+  #### Next version #################
+  title = LP49: CD BOOT (Hvm + Pc + Init + DosSrv + 9660Srv)
+  kernel=/l4/kickstart-0804.gz
+  module=/l4/l4ka-0804.gz
+  module=/l4/sigma0-0804.gz
+  module=/boot/hvm.gz
+  module=/boot/pc.gz
+  module=/boot/init.gz    ---- init will fork either "rc" or "qsh" shell.
+  module=/boot/dossrv.gz
+  module=/bin/9660srv
+
+
+<<< CD driver >>>
+  - On some machine, LP49 can not read the CD drive.
+
+
+<<< Console >>>
+ - Back/Forward Arrows
+
+
+<<< Name space management >>>
+
+
+
+<<< Server registration/link >>>
+
+
++---------------------------------------------------------------+
+|      New features to be added                                 |
++---------------------------------------------------------------+
+
+<<< Root file system install >>>
+
+
+<<< notify >>>
+
+
+
+<<< L4 thread library >>>
+
+
+  * Asyncronous message: to be extended.
+
+  * Which direction:
+   Cf.  src/linthread  --- CSP like model
+
+
++---------------------------------------------------------------+
+|      Program refinement                                       |
++---------------------------------------------------------------+
+** Dirty code is hoped to be cleaned **
+
+
+<<< Pager >>>
+
+	* srv/9/hvm/mx-pager.c 
+	* Hard work, but enjoyable !
+
+
+<<< Exception handling >>>
+
+
+
+<<< Buffer copy in syscall>>>
+
+   * In case of small size, string copy is more efficient than fpage mapping.
+
+
+<<< Dirty code refine >>>
+
+   * Widely spreading !!
+
+<<< Complex code refine >>>
+    * chan.c
+    * dev.c
+    * devmnt.c
+    * devsd.c  sdata.c
+    * proc.c
+    * sysproc.c
+    * sysfile.c
+    * syssrv.c
+    * xalloc.c
+
+
+<<< Multi threading >>>
+
+
+<<< Elliminate unused codes >>>
+
+
++---------------------------------------------------------------+
+|      Wish list                                                |
++---------------------------------------------------------------+
+
+<<< USB2.0 EHCI >>>
+    * USB2.0 support is strongly hoped, but no time...
+    * USB boot is strongly wished.
+
+
+<<< GVA >>>
+    src/9/vga/*
+    src/libdraw/*
+
+    src/cmd/rio
+    
+
+<<< HTTPD >>>
+
+
+<<< Authentication >>>  -- Future plan
+    * Auth Server 
+    * 
+
+
+
+
+
+
+<<< Distributed Communicating Sequential Processes >>>
+
+

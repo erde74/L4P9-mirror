@@ -1,0 +1,224 @@
+<HTML>	<HEAD>
+        <meta http-equiv="Content-Type" content="text/html; charset=euc">
+	<TITLE>  デバッグ用簡易SHELL QSHコマンド   </TITLE>
+	</HEAD>
+<BODY BACKGROUND = "../Icons1/bg3.gif">
+
+<!-------------------------------------------------------
+<H2>
+(<A HREF=index-e.html> GO TO  English page </A>)
+(<A HREF=./L4minix.html> GO TO  L4Minix Home Page </A>) </H2><HR>
+------------------------------------------------------->
+
+<IMG SRC="./../gif/A.tanuki1.gif"> 
+
+<H1>  
+<FONT COLOR="#0000FF">
+デバッグ用簡易SHELL QSHコマンド
+</FONT>
+</H1> 
+
+
+
+
+<H3><IMG SRC="./../gif/dotto.gif" > 
+ QSHは、デバッグをするために作った簡易シェルです。
+ 本格SHELLは、別途作ります。
+</H3>
+
+</H1> 
+
+
+<DL>
+
+<DT> help, help2, help3
+   <DD> ヘルプメッセージ
+
+
+<DT>  ls  [パス]          
+<DD>  
+                                                                                       
+                                                                                       
+<DT>  cd  [パス]  
+<DD>  チェンジディレクトリー
+                                                                                       
+<DT>  pwd                
+<DD>  show the current working directory
+                                                                                       
+<DT>  pi                  
+<DD>  Show the pi-value
+                                                                                       
+<DT>  credits          
+<DD>   Contributors
+                                                                                       
+<DT>  echo  文字列
+<DD>   echo back any-string
+                                                                                       
+                                                                                       
+<DT>  cat パス
+<DD>    displays contents of the file <path>
+    
+                                                                                   
+<DT>  open    [-rwWxtcde] パス  モード <BR> 
+    -r Read         <BR>
+    -w Write        <BR>
+    -x Executable   <BR>
+    ....            <BR>
+                        
+<DD>  ....                                                             
+                                                                                       
+<DT>  create  [-rwWxc]  パス  パーミッション
+<DD>  ....
+                                                                                       
+<DT>  close  ファイル記述子
+<DD>  ....
+                                                                                       
+<DT>  seek  ファイル記述子  オフセットp  タイプ
+<DD>  .....
+                                                                                       
+<DT>  rm  パス  
+<DD>         Delete a file         Not-Yet-Implemented
+                                                                                       
+                                                                                       
+<DT>  write    ファイル記述子  文字列
+<DD>  ....
+                                                                                       
+<DT>  pwrite  ファイル記述子  オフセット   文字列 
+<DD>  ....
+ 
+                                                                                      
+<DT>  read  ファイル記述子
+<DD>  .....
+                                                                                       
+<DT>  pread   ファイル記述子  オフセット
+<DD>  .....
+                                                                                       
+<DT>  preadx ファイル記述子  オフセット  [ サイズ ]
+<DD>        show the contents in Hex and ascii of <fd> file
+                                                                                       
+                                                                                       
+<DT>  pipe
+<DD>   パイプを作る  <BR>
+       LP49[/] pipe  <BR>
+         pipe  fd[0]=0 fd[1]=1  <BR>
+
+       LP49[/] write 0 文字列  <BR>
+       LP49[/] read  1  <BR>
+<BR>
+                                                                                       
+<DT>  mkdir パス
+<DD>    make a new directory
+                                                                                       
+                                                                                       
+<DT>  kd
+<DD>                          Enter into the L4 kernel bebugger
+                                                                                       
+<DT>  debug  [ on | off]
+<DD>  ....                                                                                     
+    
+                                                                                   
+<DT>  d  テーブル名  アドレス
+<DD>   アドレス番地をテーブル名のデータとしてダンプする   <BR>
+                                                                                       
+        <>  <tblname> ::= chan|ch|namec|dev|mount|mhead|mnt|pgrp|proc    <BR>
+        <>  d {up | ns}       dump the current proc or namespace          <BR>
+                                                                          <BR>             
+        Ex.  <>  d  up     show the current process table               <BR>
+             <>  d  ns     show the name space of the current process   <BR>
+<BR>    
+                                                                       
+            
+<DT>  dump <process_nr> <start_adrs> <size>     
+<DD>   Memory dump
+                                                                                       
+                                                                                       
+                                                                                       
+<DT>  bind [-abcC]  #名前   マウントポイント  <BR>
+    -a after                                   <BR>
+    -b before                                <BR>
+    -c allow creattion    -ac, -bc           <BR>
+
+<DD> デバイスを名前空間にバインドする。
+<PRE>                                                                                       
+    Ex.  bind -a #l  /net          
+         bind -a #SsdC0  /dev
+</PRE>                                                                                       
+<BR>
+
+                                                                                       
+<DT>  mount [-abcC] <srvname> <mountpoint> <spec>   <BR>
+    -a after               <BR>
+    -b before               <BR>
+    -c allow creation    -ac, -bc   <BR>
+    -C                              <BR>
+
+<DD>  サーバを名前空間にマウントする。
+<PRE>                                                                                       
+    Ex.  mount -c /srv/dos /tmp  /dev/fd0ctl
+</PRE>
+                                                                                       
+                                                                                       
+<DT>  umount         
+<DD>  Not-Yet-Implemented
+                                                                                       
+                                                                                       
+<DT>  putenv  <name>  <value>
+<DD>   
+                                                                                    
+<DT>  getenv  <name>
+<DD>                                                                                       
+                                                                                       
+<DT>  rfork 
+<DD>         Not-Yet-Implemented
+                                                                                       
+<DT>  fork
+<DD>           Not-Yet-Implemented
+                                                                                       
+<DT>  exec    
+<DD>       Not-Yet-Implemented
+                                                                                       
+                                                                                       
+<DT>  spawn  パス  パラメータ
+<DD>  プロセスを生成し、指定されたプログラムを実行する。
+
+
+<DT>  startdos,  dostest
+<DD>
+
+<DT>  nstart
+<DD>                                                                                       
+                                                                                       
+<DT>  putsl              
+<DD>  _write $sl
+
+<DT>  put <txt>         
+<DD>   _write <text>
+
+<DT>  get           
+<DD>      displays contents _written                                                                                      
+
+
+<DT>  ......
+<DD>  ......
+
+
+</DL>
+
+
+
+
+<HR>
+ Last Modified 2007-05-20, NII
+</HTML>
+
+
+
+
+
+
+
+
+
+
+
+ 

@@ -1,0 +1,28 @@
+################################################
+SHELL    = bash
+RM       = rm
+LN_S     = ln -s
+CC       =  gcc 
+LD       = ld
+OBJCOPY  = objcopy
+STRIP    = strip
+AR       = ar
+GZIP     = gzip
+ZIP      = zip 
+AWK      = awk
+RANLIB   = ranlib 
+CP	 = cp
+
+### compile rules ################################
+%.o:    %.S
+	$(CC) $(CPPFLAGS) $(SFLAGS) -o $@ -c $<
+
+%.o:    %.s
+	$(CC) $(CPPFLAGS) $(SFLAGS) -o $@ -c $<
+
+%.o:    %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c $<
+
+%.gz:   %
+	$(GZIP)  -c $< > $@
+

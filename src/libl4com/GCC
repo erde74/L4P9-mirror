@@ -1,0 +1,23 @@
+<><><><><> GCC 4.x version problem ? <><><><>
+
+* LP49 has been developed using GCC v3.2 compiler.
+
+* LP49 binary code compiled by GCC 4.x  failed to run !!
+
+* It seems that static variable "th_num_indx" in 
+  src/libl4com/l4-tidutcb.c misbehaves with GCC 4.x.
+
+   --- Misunderstanding ?   
+   --- Program bug ?, 
+   --- GCC bug ? 
+
+* Therefore, libl4com is recommended to be compiled with  GCC V3.2.
+
+* However, recent Linux's includee no  GCC V3.2, 
+  To go around with GCC V4.x, tricky coding is applied to src/9/port/syssrv-l4.c. 
+  This trivk is hoped to work with GCC V4.x.
+
+
+
+
+ 

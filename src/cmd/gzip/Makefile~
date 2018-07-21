@@ -1,0 +1,95 @@
+### WHERE #################################
+INC_DIR    = ../../../include
+CRT0       = ../../../lib/crt0-ia32.o
+LIB_DIR    = ../../../lib
+
+####################################################################
+# this should be the very first rule
+_default: all
+
+####################################################################
+
+CFLAGS	+= -Wall -Wno-format -O -fomit-frame-pointer -freg-struct-return
+CFLAGS		+= -fsigned-char -funsigned-bitfields
+
+INCLUDES	+= $(INC_DIR) 
+		   
+CPPFLAGS	+= -nostdinc -fno-builtin \
+	$(addprefix -I, $(INCLUDES)) $(addprefix -D, $(DEFINES))
+
+SFLAGS	+= -DASSEMBLY
+
+####################################################################
+# some evil magic
+
+ifeq ($(findstring -fomit-frame-pointer, $(CFLAGS)), -fomit-frame-pointer)
+DEFINES	+= NO_FRAME_POINTER
+endif	
+
+####################################################################
+# compile rules
+include  ../../Maketool
+
+
+#### Linker ########################################################
+
+LINKBASE = 0x00C00000
+
+LIBGCC	 = $(dir $(shell $(CC) --print-lib))
+LDFLAGS  += -nostdlib -L$(LIBGCC) -L$(LIB_DIR)
+
+
+
+####################################################################
+# library rules
+# LIB_OBJ	= $(patsubst %.S, %.o, $(patsubst %.c, %.o, $(LIB_SRC)))
+
+# $(LIB): $(LIB_OBJ)
+#	$(AR) -rcs $(LIB) $(LIB_OBJ)
+
+####################################################################
+# striptease
+
+# %.stripped:	%
+#	@chmod a+r $^
+#	@chmod a-x $^
+#	@cp -fp $^ $@
+#	$(STRIP) $@
+
+# dependencies ####################################################
+# .depend:	$(SRCS)
+#	@echo Building dependencies in `pwd`
+#	@$(CC) $(CPPFLAGS) -o - -M $(SRCS) > $@
+
+####################################################################
+OBJ =   zip.o  unzip.o  gzip.o  gunzip.o  
+
+
+TARGET  =  zip  unzip  gzip  gunzip  
+
+all:  $(TARGET)
+
+gzip:  gzip.o
+	$(LD) $(LDFLAGS) -e_start -Ttext=$(LINKBASE)  -o $@ \
+		$(CRT0) $^ -lauth -lbio -lregexp  -lc -ll4io -lgcc -ll4 -ll4com -lflate
+	$(STRIP)  $@
+
+gunzip:  gunzip.o
+	$(LD) $(LDFLAGS) -e_start -Ttext=$(LINKBASE)  -o $@ \
+		$(CRT0) $^ -lauth -lbio -lregexp  -lc -ll4io -lgcc -ll4 -ll4com -lflate 
+	$(STRIP)  $@
+
+zip:  zip.o
+	$(LD) $(LDFLAGS) -e_start -Ttext=$(LINKBASE)  -o $@ \
+		$(CRT0) $^ -lauth -lbio -lregexp  -lc -ll4io -lgcc -ll4 -ll4com -lflate 
+	$(STRIP)  $@
+
+unzip:  unzip.o
+	$(LD) $(LDFLAGS) -e_start -Ttext=$(LINKBASE)  -o $@ \
+		$(CRT0) $^ -lauth -lbio -lregexp  -lc -ll4io -lgcc -ll4 -ll4com -lflate 
+	$(STRIP)  $@
+
+clean::
+	rm -f *~ *.o $(TARGET)  $(TARGET).gz
+
+

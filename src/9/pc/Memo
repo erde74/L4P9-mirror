@@ -1,0 +1,161 @@
+<> devsd-test <>
+
+<>RESET<>
+
+sdreset()
+	atapnp() 1841
+		ataprobe() 737 on 0x1F0
+			ioalloc()	
+			ioalloc()	
+			ataready()
+			atadrive() 621
+				ataidentify() 574
+				malloc() : Drive 
+				"atadrive:HDD-Model= %s"
+				atarwmmode()
+				atadmamode() 
+				<- Drive
+			malloc(): Ctlr 
+			malloc(): SDev 
+			atadrive() 621
+                                ataidentify() 574
+                                malloc() : Drive
+                                "atadrive:HDD-Model= %s"
+                                atarwmmode()
+   	                        atadmamode()
+                                <- Drive
+ 		<- SDev
+		ataprobe() 737 on 0X170
+			:
+			:
+	<---
+<---
+
+
+
+<> ATTACH <>
+
+sdattach("sdC0") 578
+	sdgetdev() 235
+		sdindex() 224
+	sdgetunit() 251
+		unit=malloc(): SDunit
+		ataenable()
+			intrenable()
+		scsiverify()
+			r=malloc():SDreq
+			inquiry=sdmalloc(): uchar*
+	
+	:
+	:
+
+	devattach()
+		c=newcahn()
+		mkqid()
+		c->path=newpath()
+	<-- c
+
+
+<> WALK <>
+sdwalk()
+	devwalk()
+	(s)malloc()	
+	devclone()
+	(s)malloc()
+sdwalk()
+	devwalk()
+	(s)malloc()
+	devclone()	
+	(s)malloc()
+	sdgen()
+	sdgetdev()
+	sdindex()
+	sdinitpart()
+	scsionline()
+	malloc(308)
+	malloc(8)
+	scsirio()
+	atario()
+		atagenio()
+		gen-cmd[25 0 ...]
+		atasetsense()
+	sdaddpart()
+	malloc(440)
+	malloc(5)
+	malloc(4)
+	getconf(sdC0part)
+	sdaddpart()  dos 63 200
+	malloc(4)
+	malloc(4)
+	sdaddpart()  plan9 201 400
+	malloc(6)
+	malloc(4)
+	sd2gen()
+	sdgetdev()
+	sdindex()
+	mkqid()
+	malloc(4)
+	devdir()
+	seconds()
+	(s)malloc(52)
+	(s)malloc(26)
+	(s)malloc(80)
+	sdclose()
+
+
+
+<> OPEN <>
+
+
+
+===== [070705]  l4getc()   "busy-waiting" ==> "polling" =====
+	
+[1] src/libl4/l4io/x86-i586-getc.c
+  
+char l4getc()
+{
+  static byte_t last_key = 0;
+  static byte_t shift = 0;
+  char c;
+  while(1) {
+    unsigned char status;
+    status = kbd_read_status();
+    while (status & KBD_STAT_OBF) { // strange coding ?
+      byte_t scancode;
+      scancode = kbd_read_input();
+      /* check for SHIFT-keys */
+      if (((scancode & 0x7F) == 42) || ((scancode & 0x7F) == 54))
+        {
+          shift = !(scancode & 0x80);
+          continue;
+        }
+      /* ignore all other RELEASED-codes */
+      if (scancode & 0x80)
+        last_key = 0;
+      else if (last_key != scancode)
+        {
+          last_key = scancode;
+          c = keyb_layout[shift][scancode];
+          if (c > 0) return c;
+        }
+    }
+    L4_Sleep(L4_TimePeriod(20));  // <--- Add this 
+  }
+}
+
+[2] src/9/pc/kbd.c :  
+void
+kbdenable(void)
+{
+        kbdq = qopen(4*1024, 0, 0, 0);
+        if(kbdq == nil)
+                panic("kbdinit");
+        qnoblock(kbdq, 1);
+        ioalloc(Data, 1, 0, "kbd");
+        ioalloc(Cmd, 1, 0, "kbd");
+        // intrenable(IrqKBD, i8042intr, 0, BUSUNKNOWN, "kbd"); // comment out
+}
+
+[3] 
+
+

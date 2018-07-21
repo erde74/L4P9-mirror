@@ -1,0 +1,75 @@
+*****************************************************************
+*       Linux                                                   *
+*****************************************************************
+
+
+==== How to mount a loopback floppy device onto Linux ===========
+
+[1]  .bashrc
+
+alias mntfd='losetup /dev/loop1 /home/maruyama/LP49/lp49-boot.fd ; mount /dev/loop1 /mnt/floppy; ls /mnt/floppy' 
+alias x2mntfd='losetup /dev/loop1 /home/maruyama/LP49/lp49-boot-x2.fd ; mount /dev/loop1 /mnt/floppy; ls /mnt/floppy' 
+
+alias umntfd='umount /mnt/floppy; losetup -d /dev/loop1; echo umount-FD'
+
+
+
+==== How to mount a qemu virtual disk onto Linux  ===========
+
+[1] .bashrc
+alias qemuhd='losetup /dev/loop2 /home/maruyama/LP49/lp49.disk; mount -t vfat -o loop,offset=$((63*512)) /dev/loop2 /mnt/qemu; ls /mnt/qemu'
+
+alias uqemuhd='umount /mnt/qemu;  losetup -d /dev/loop2; echo umount-QEMUHD" 
+
+
+
+==== How to analyze the partitons of qemu virtual HDD ==================
+
+     [root@dhcp64-211 ~]# 
+     [root@dhcp64-211 ~]# losetup  /dev/loop2 /home/maruyama/qemu/lp49.disk
+     [root@dhcp64-211 ~]# fdisk -lu /dev/loop2
+
+     Disk /dev/loop2: 134 MB, 134217728 bytes
+     16 heads, 63 sectors/track, 260 cylinders, total 262144 sectors
+     Units = セクタ数 of 1 * 512 = 512 bytes
+     Disk identifier: 0x00000000
+
+     デバイス Boot      Start         End      Blocks   Id  System
+     /dev/loop2p1              63      132047       65992+   b  W95 FAT32
+     /dev/loop2p2          132048      262079       65016   83  Linux
+
+
+     [root@dhcp64-211 ~]# mount -t vfat -o loop,offset=$((63*512)) /dev/loop2 /mnt/qemu
+
+     [root@dhcp64-211 ~]# cd /mnt/qemu
+     [root@dhcp64-211 qemu]# cp /home/maruyama/LP49/LP49-081030/rootfs/bin/* .
+
+     [root@dhcp64-211 qemu]# umount /mnt/qemu
+     [root@dhcp64-211 qemu]# losetup -d /dev/loop2
+
+
+*****************************************************************
+*       Qemu                                                    *
+*****************************************************************
+
+===== Making virtual disk ===============
+
+      $  qemu-img  create  lp49.disk 128M
+
+
+==== Starting qemu ======================
+
+     $ qemu -fda lp49-boot-x2.fd -std-vga -net nic -net tap
+
+     $ qemu -hda lp49.disk -fda lp49-boot-x2.fd -boot a -std-vga -net nic -net tap
+
+
+=== Qemu monitor ==================
+
+    Ctl-Alt-1     entering target system
+    Ctl-Alt-2     entering monitor
+
+    (qemu)  eject  fda
+    (qemu)  change  fda fd.img
+
+

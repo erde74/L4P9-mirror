@@ -1,0 +1,368 @@
++=====================================================+
+|           Memo                                      |
+|                                                     |    
++=====================================================+
+<Updated>
+	080711
+
+
+
+<<< PC memory map >>>
+
+	* [0 .. 640K)  
+	   Usable ?
+
+	* [640k .. 1M)
+	    [0x000a0000 .. 0x000c0000) Video 
+	    [0x000f0000 .. 0x00100000) BIOS
+
+	* [1M .. 16M)
+	* [16M ..   
+
+	* 0x472     cf. kbd.c,  BIOS ?
+
+
+<<< Grub >>>
+
+	* FDD/USB
+
+	* Temporary loading address
+
+	* Loading 
+
+	* USB and BIOS
+
+
+<<< LP49 is put at >>>
+	* 869000 .. 8DD400 :   Mapped bootloader module (pc.gz)
+	* 8DE000 .. 9027FF :   Mapped bootloader module (qsh.gz)
+	* 903000 .. 9203FF :   Mapped bootloader module (dossrv.gz)
+	*   1000 ..   1FFF :   Mapped bootinfo region
+
+	* 869000 .. 8DD208 :  pc.gz
+	* 8DE000 .. 90252C :  qsh.gz
+	* 903000 .. 9203FF :  dossrv.gz
+
+
+
+<<< L4 memory reagin list >>>
+
+	       [0 .. 9F800)  638K  Conventionalmem
+	       [0-C0000000)        Conventionalmem
+
+	    [1000 .. 2000)         CODE: Initdata
+	    [2000 .. 3000)         CODE: Initdata  
+	   [20000 .. 28800)        CODE: L4Server
+	   [9F800 .. A0000)        ArchDepend,   BIOS ?
+	   [A0000 .. C0000)        SharedMem     VRAM
+	   [C0000 .. F0000)        SharedMem
+	   [DC000 .. 100000)       ArchDepend    BIOS ?
+
+	  [100000 .. C2F0000)      ConventionalMem
+	  [100000 .. 146000)       ReservedMem
+
+	  [869000 .. 8DD400)       CODE: module (pc.gz)
+	  [8DE000 .. 902800)       CODE: module (qsh.gz)
+	  [903000 .. 920400)       CODE: module (dossrv.gz) 
+	  [A00000 .. A22C00)       CODE: L4Server (hvm.gz ??)
+
+	 [B2F0000 .. C2F0000)      ReservedMem
+	 [C2F0000 .. C2FF000)      ArchDepend
+	 [C2FF000 .. C300000)      ArchDepend
+	 [C300000 .. C400000)      ConventionalMem
+
+	[FEC00000 .. FEC10000)     ArchDepend
+	[FEE00000 .. FEE01000)     ArchDepend
+	[FFFE0000 .. FFFFFFFF] 128K ArchDepend    BIOS ?
+
+
+
+
+<<< DMA >>>
+
+	*  < 16M  ?
+	*  ISA 
+	*  FDD
+	*  HDD
+	*  PCI devices 
+	*  USB 
+
+
+<<< PCI >>>
+	* config_address register   
+		IOport: 0x0cf8
+
+	* config_data register      
+		IOport:  0x0cfc..0x0cff
+
+
+
+<<< BIOS >>>
+
+	* [0x000F_0000 .. 0x000F_FFFF)	
+
+
+
+<<< VESA >>>
+
+	*  BIOS16  ?
+
+	*  BIOS32  ?
+
+
+
+<<< ISAconfig >>>
+
+
+
+
+<<< Making LP49 on GCC4.2 >>>
+
+	* make --- OK
+
+	* run  --- NG  --- IRQ messages not sent ?
+
+
+
+
+
+/*****************************************************
+ *        Device drivers                  	     *   	
+ *****************************************************/
+
+<><><><><><><><> Device drivers: pc/dev___.c <><><><><><><><><><><>
+[ src/9/pc ]
+   1014    3144   21105 devarch.c
+   1484    3765   28338 devcons.c
+    573    1560   12464 devether.c
+   1249    3349   25259 devfloppy.c
+   1075    3186   21480 devi82365.c
+   1980    5803   40832 devpccard.c
+    466    1082    7465 devrtc.c
+   1070    2893   21707 devusb.c
+
+
+<<< devarch.c >>>
+<Function>
+	+ IO space allocation
+
+
+<Devices>
+	? i82557
+	? i8253
+	? i8259
+
+
+<<< devcons.c >>>
+<Functions>
+	
+
+<IRQ>
+
+<Devices>
+	+ i8042
+
+<TBD>
+	+ Time control
+
+<<< devether.c >>>
+<Functions>
+	+
+	+ etherprobe
+
+<Devices> 
+
+<Q>
+	+ isaconfig()
+
+
+<<< devfloppy.c >>>
+
+	+ Thread: floppykproc (motor control) is started in floppyattach().
+
+	+ I82077A device
+
+	+ DMA : dmasetup() in floppyxfer() 
+
+
+<<< devusb.c >>>
+
+	+ usbprobe()
+		isaconfig()
+
+
+<<< dma.c >>>
+
+	+ i8237
+
+<Physical/logical address >
+	+ request_alloc_for_dma() is used instead of xspanalloc()
+
+	+ BOUNCEBUF_LADDR == 1<<30 
+
+	+ size ? 
+
+ 	
+
+
+
+/*****************************************************
+ *        Basic compenets: port/dev__.c       	     *   	
+ *****************************************************/
+
+
+[ src/9/port]
+    566    1689   12238 dev.c
+    153     384    2540 devdup.c
+    445    1080    8021 devenv.c
+    600    1722   10854 devfs.c
+    745    2050   15507 devloopback.c
+   1587    4505   33640 devmnt.c
+    480    1227    9462 devpipe.c
+   1676    4316   33964 devproc.c
+    847    2529   17841 devramfs.c
+    327     876    6486 devroot.c
+    115     342    3082 devsd-test2.c
+   1675    4630   37573 devsd.c
+    376     958    7647 devsrv.c
+    916    2166   15387 devtinyfs.c
+
+    729    1981   14676 netif.c
+
+[ src/9/ip ]
+   1578    3742   28856 devip.c
+
+
+
+
+/*****************************************************
+ *        Software components         	             *   	
+ *****************************************************/
+
+
+<<< Dev interface >>>
+
+struct Dev
+{
+        int     dc;
+        char*   name;
+ 
+        void    (*reset)(void);
+        void    (*init)(void);
+        void    (*shutdown)(void);
+        Chan*   (*attach)(char*);
+        Walkqid*(*walk)(Chan*, Chan*, char**, int);
+        int     (*stat)(Chan*, uchar*, int);
+        Chan*   (*open)(Chan*, int);
+        Chan*   (*create)(Chan*, char*, int, ulong);  //% nil:ERR <- void
+        int     (*close)(Chan*);                    //% ONERR <- void
+        long    (*read)(Chan*, void*, long, vlong);
+        Block*  (*bread)(Chan*, long, ulong);
+        long    (*write)(Chan*, void*, long, vlong);
+        long    (*bwrite)(Chan*, Block*, ulong);
+        int     (*remove)(Chan*);    //% ONERR <- void
+        int     (*wstat)(Chan*, uchar*, int);
+        void    (*power)(int);  /* power mgt: power(1) => on, power(0) => off */
+        int     (*config)(int, char*, DevConf*); //% ONERR<-void
+};
+
+
+<<< Message interface as in Minix >>>
+
+	+ Each components shall have a thread to receive message.
+	+ Minix drivers are good example.
+
+	+ Message
+
+
+<<< 9P protocol >>>
+
+typedef struct  Fcall {
+        uchar   type;
+        u32int  fid;
+        ushort  tag;
+        union {
+                struct {
+                        u32int  msize;          /* Tversion, Rversion */
+                        char    *version;       /* Tversion, Rversion */
+                };
+                struct {
+                        ushort  oldtag;         /* Tflush */
+                };
+                struct {
+                        char    *ename;         /* Rerror */
+                };
+                struct {
+                        Qid     qid;            /* Rattach, Ropen, Rcreate */
+                        u32int  iounit;         /* Ropen, Rcreate */
+                };
+                struct {
+                        Qid     aqid;           /* Rauth */
+                };
+                struct {
+                        u32int  afid;           /* Tauth, Tattach */
+                        char    *uname;         /* Tauth, Tattach */
+                        char    *aname;         /* Tauth, Tattach */
+                };
+                struct {
+                        u32int  perm;           /* Tcreate */
+                        char    *name;          /* Tcreate */
+                        uchar   mode;           /* Tcreate, Topen */
+                };
+                struct {
+                        u32int  newfid;         /* Twalk */
+                        ushort  nwname;         /* Twalk */
+                        char    *wname[MAXWELEM];       /* Twalk */
+                };
+                struct {
+                        ushort  nwqid;          /* Rwalk */
+                        Qid     wqid[MAXWELEM];         /* Rwalk */
+                };
+                struct {
+                        vlong   offset;         /* Tread, Twrite */
+                        u32int  count;          /* Tread, Twrite, Rread */
+                        char    *data;          /* Twrite, Rread */
+                };
+                struct {
+                        ushort  nstat;          /* Twstat, Rstat */
+                        uchar   *stat;          /* Twstat, Rstat */
+                };
+        };
+} Fcall;
+
+
+
+<<< Minix >>>
+
+   ----------------------------------------------------------------
+   |  DEV_OPEN  | device  | thread  |         |         |         |
+   |------------+---------+---------+---------+---------+---------|
+   |  DEV_CLOSE | device  | thread  |         |         |         |
+   |------------+---------+---------+---------+---------+---------|
+   |  DEV_READ  | device  | thread  |  bytes  |  offset | buf ptr |
+   |------------+---------+---------+---------+---------+---------|
+   |  DEV_WRITE | device  | thread  |  bytes  |  offset | buf ptr |
+   |------------+---------+---------+---------+---------+---------|
+   |SCATTERED_IO| device  | thread  | requests|         | iov ptr |
+   |--------------------------------------------------------------|
+   |  DEV_IOCTL | device  | thread  |func code|         | buf ptr |
+   ----------------------------------------------------------------
+
+
+
+<<< Lowlevel interfaces >>>
+
+ 	+ Basis functions 
+
+		+ L4 primitives
+		+ Pager
+		+ Synchronization primitives
+		+ Async. message primitives
+		+ Some other primitives
+
+
+	+ lowlevel library functions 
+		
+		+ 
+
+

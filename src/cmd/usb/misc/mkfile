@@ -1,0 +1,27 @@
+</$objtype/mkfile
+
+TARG=\
+#	readir\
+	usbmouse\
+#	usbprobe\
+
+HFILES=\
+	../lib/usb.h\
+
+LIB=../lib/usb.a$O
+
+UPDATE=\
+	$HFILES\
+	${OFILES:%.$O=%.c}\
+	mkfile\
+	usbprint\
+
+BIN=/$objtype/bin/usb
+</sys/src/cmd/mkmany
+
+CFLAGS=-I../lib $CFLAGS
+
+$LIB:
+	cd ../lib
+	mk install
+	mk clean

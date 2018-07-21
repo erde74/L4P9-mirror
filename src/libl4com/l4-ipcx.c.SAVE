@@ -1,0 +1,233 @@
+/*******************************************************
+ *          ipcx.c                                     *
+ *          2005-08-17 KM                              *
+ *******************************************************/
+
+#include <l4all.h>
+#include <l4/l4io.h>
+#include "../9/hvm/mm.h"
+
+typedef void (*sighandler_t) (int);
+ 
+/********************************************************
+ *         IPC support thread                           *
+ ********************************************************/
+
+static void ipcx( )
+{
+  L4_ThreadId_t  caller;
+  L4_MsgTag_t    tag;
+  int  cmd, adrs, size;
+  L4_Msg_t        _MRs; 
+  L4_MsgBuffer_t  _BRs;
+  L4_StringItem_t ss;
+
+  while(1) {
+    L4_LoadBR(0, 0);
+    tag = L4_Wait(&caller); // Receive request command
+    L4_MsgStore(tag, &_MRs);
+    cmd = L4_MsgLabel(&_MRs);
+    adrs = L4_MsgWord(&_MRs, 0);
+    size = L4_MsgWord(&_MRs, 1);
+    // l4printf(" IPCX caller=%x cmd=%d adrs=%x size=%x \n", 
+    //	   caller.raw, cmd, adrs, size);  
+    // caller validity check: to be programmed ----
+
+    switch(cmd){        
+    case COPYIN:   //0
+      L4_MsgClear(&_MRs);
+      ss = L4_StringItem(size, (void*)adrs);
+      L4_MsgAppendSimpleStringItem(&_MRs, ss);
+      L4_MsgLoad(&_MRs);
+      tag = L4_Send(caller);
+      break;
+
+    case COPYOUT: //1
+      L4_MsgBufferClear(&_BRs);
+      ss = L4_StringItem(size, (void*)adrs);
+      L4_MsgBufferAppendSimpleRcvString(&_BRs, ss);
+      L4_AcceptStrings(L4_StringItemsAcceptor, &_BRs);
+      tag = L4_Receive(caller);
+      break;
+        
+    default:
+      L4_KDB_Enter("IPCX-ERR ");
+    }
+  } //while
+}
+
+#if 0 // Followings are defined in L4-if.c -----------------------------
+int copyin(int task_rawid, char * from_adrs,
+	   char * to_adrs,   int size)
+{
+  L4_MsgTag_t    tag;
+  L4_Msg_t        _MRs; 
+  L4_MsgBuffer_t  _BRs;
+  L4_StringItem_t ss;
+  L4_ThreadId_t  ipcx_tid; 
+  ipcx_tid.raw = GET_IPCX_TID(task_rawid); 
+  L4_MsgClear(&_MRs);
+  L4_MsgAppendWord(&_MRs, (int)from_adrs);
+  L4_MsgAppendWord(&_MRs, size);
+  L4_MsgLoad(&_MRs);
+  L4_MsgBufferClear(&_BRs);
+  ss = L4_StringItem(size, (void*)to_adrs);
+  L4_MsgBufferAppendSimpleRcvString(&_BRs, ss);
+  L4_AcceptStrings(L4_StringItemsAcceptor, &_BRs);
+  tag = L4_Call(ipcx_tid);
+  return 0;
+} 
+
+//---------------------------------------------
+int copyout(int task_rawid, char * to_adrs,
+	    char * from_adrs,   int size)
+{
+  L4_MsgTag_t    tag;
+  L4_Msg_t  _MRs;
+  L4_StringItem_t ss;
+  L4_ThreadId_t  ipcx_tid; 
+  ipcx_tid.raw = GET_IPCX_TID(task_rawid); 
+  L4_MsgClear(&_MRs);
+  L4_MsgAppendWord(&_MRs, (int)to_adrs);
+  L4_MsgAppendWord(&_MRs, size);
+  L4_MsgLoad(&_MRs);
+  tag = L4_Send(ipcx_tid);
+  L4_MsgClear(&_MRs);
+  ss = L4_StringItem(size, (void*)from_adrs);
+  L4_MsgAppendSimpleStringItem(&_MRs, ss);
+  L4_MsgLoad(&_MRs);
+  tag = L4_Send(ipcx_tid);
+  return 0;
+}
+#endif //--------------------------------------------------
+
+//--------------------------------------------------
+static L4_ThreadId_t create_ipcx_thread ( )
+{
+  static int stack[1024];
+  int   rc;
+  L4_ThreadId_t  myself = L4_Myself(),
+                 mypager = L4_Pager();
+  L4_ThreadId_t  ipcx_thread;
+  L4_Word_t  utcb;
+  
+  get_new_tid_and_utcb(& ipcx_thread, (void*)& utcb);
+  rc = requestThreadControl(ipcx_thread, myself, myself, mypager, utcb);
+  l4printf("<> IPCX_THREAD TID=%X  UTCB=%X  RC= %d \n",  ipcx_thread, utcb, rc);
+ 
+  L4_Start_SpIp(ipcx_thread, (L4_Word_t) &stack[1020], (L4_Word_t)ipcx);
+  return ipcx_thread;
+}
+
+
+/********************************************************
+ *         SIGNAL support thread                        *
+ ********************************************************/
+
+static void signal_thread_body( )
+{
+  L4_ThreadId_t  caller;
+  L4_MsgTag_t    tag;
+  int  signum;
+  sighandler_t   sighandler;
+  L4_Msg_t  _MRs;
+
+  while(1) {
+    L4_LoadBR(0, 0);
+    tag = L4_Wait(&caller);
+    // if (L4_Label(tag) != SIGNAL ) .....;
+    L4_MsgStore(tag, &_MRs);
+    signum = (int) L4_MsgWord(&_MRs, 0);
+    sighandler = (sighandler_t)L4_MsgWord(&_MRs, 1);
+
+    //l4printf("\n SGNL_TH  caller=%x  signum=%d   handler=%x  \n",
+    //	   caller.raw, signum, sighandler);  
+    // caller check: to be programmed ----
+
+    L4_Yield();
+    if (sighandler) 
+      (*sighandler)(signum);
+  } //while
+}
+
+//--------------------------------------------------
+void pr_prio(int  x)
+{
+  //l4printf("PRIO prio=%d  small=%d  et=%d  mt=%d  zero=%x  raw=%x\n",
+  //	 x.sp.prio, x.sp.small,  x.sp.time_exp, x.sp.time_man, 
+  //	 x.sp.zero, x.sched_param);
+}
+
+static L4_ThreadId_t create_signal_thread ( )
+{
+  static int stack[1024];
+  int   rc;
+  L4_ThreadId_t  myself = L4_Myself(),
+                 mypager = L4_Pager();
+  L4_ThreadId_t  signal_thread;
+  L4_Word_t  utcb;
+
+  get_new_tid_and_utcb(& signal_thread, (void*)& utcb);
+  rc = requestThreadControl(signal_thread, myself, myself, mypager, utcb);
+  l4printf("<> SIGNAL_THREAD TID=%X  UTCB=%X  RC= %d \n", signal_thread, utcb, rc);
+ 
+  L4_Start_SpIp(signal_thread, (L4_Word_t) &stack[1020], (L4_Word_t)signal_thread_body);
+  return signal_thread;
+}
+
+/****************************************************
+ *  Create IPCX thread and SIGNAL thread            *
+ ****************************************************/
+
+void l4_ipcx_init(void)
+{
+  static int     IamStarted = 0;
+  static int     signal_thread_is_alive = 0;  
+  L4_ThreadId_t  ipcx_thread, signal_thread, myself;
+
+  myself = L4_Myself();
+  if (GET_TASKNR(myself.raw) == 0)   // I am MM. 
+    return;
+
+  if (IamStarted == 0)
+    {
+      IamStarted = 1;
+      ipcx_thread = create_ipcx_thread( );
+      l4printf("IPCX_thread is created: %x    \n", ipcx_thread.raw); 
+    }
+
+  if (signal_thread_is_alive == 0)
+    {
+      signal_thread = create_signal_thread();
+      signal_thread_is_alive = 1;
+      l4printf("SGNL_TH=%x \n", signal_thread.raw ); 
+    }
+}
+
+
+#if 0 //----------------------------------------------------
+extern int who;  //Viewing from Servers, "who" denotes a client.  
+#define phys_bytes int
+
+int sys_copy(int from_taskid, //source process 
+	     int from_seg,    //source segment: T/D/S
+	     phys_bytes from_adrs, //source virtual address
+	     int to_taskid,   //dest process 
+	     int to_seg,      //dest segment: T/D/S
+	     phys_bytes to_adrs, //dest virtual address
+	     phys_bytes size) //how many bytes 
+{
+  L4_ThreadId_t  who_x, from_taskid_x, to_taskid_x;
+  who_x.raw = who;
+  from_taskid_x.raw = from_taskid;
+  to_taskid_x.raw = to_taskid;
+  if (who_x.id.task == from_taskid_x.id.task){
+    return copyin(from_taskid, (char*)from_adrs, (char *)to_adrs, size);
+  }
+  if (who_x.id.task == to_taskid_x.id.task) {
+    return copyout(to_taskid, (char*)to_adrs, (char *)from_adrs, size);
+  }
+  L4_KDB_Enter("SYS_COPY: not supported  \n");
+  return -1; //----
+}
+#endif //----------------------------------

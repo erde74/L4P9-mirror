@@ -1,0 +1,4 @@
+# create and write file
+create:2.out,0666
+write:Hello and Goody%c
+close

@@ -1,0 +1,4 @@
+# write file
+create:out,0666
+writev:Hello%c,Goodby%c
+close

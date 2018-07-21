@@ -1,0 +1,969 @@
+\documentclass{ipsjpapers}
+% \documentclass[draft]{ipsjpapers}
+
+\input epsf
+\input comment.sty
+
+\usepackage{mediabb}
+\usepackage[dvipdfm]{graphicx}
+
+%% 巻数，号数などの設定
+\setcounter{巻数}{50}
+\setcounter{号数}{2}
+\setcounter{volpageoffset}{1234}
+\受付{20}{9}{17}
+\採録{20}{11}{28}
+
+% ユーザが定義したマクロなど．
+\makeatletter
+\let\@ARRAY\@array \def\@array{\def\<{\inhibitglue}\@ARRAY}
+\def\<{\(\langle\)\nobreak}
+\def\>{\nobreak\(\rangle\)}
+\def\|{\verb|}
+\def\Underline{\setbox0\hbox\bgroup\let\\\endUnderline}
+\def\endUnderline{\vphantom{y}\egroup\smash{\underline{\box0}}\\}
+\def\LATEX{\iLATEX\Large}
+\def\LATEx{\iLATEX\normalsize}
+\def\LATex{\iLATEX\small}
+\def\iLATEX#1{L\kern-.36em\raise.3ex\hbox{#1\bf A}\kern-.15em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}
+\def\LATEXe{\ifx\LaTeXe\undefined \LaTeX 2e\else\LaTeXe\fi}
+\def\LATExe{\ifx\LaTeXe\undefined \iLATEX\scriptsize 2e\else\LaTeXe\fi}
+\def\Quote{\list{}{}\item[]}
+\let\endQuote\endlist
+\def\TT{\if@LaTeX@e\tt\fi}
+\def\CS#1{\if@LaTeX@e\tt\expandafter\string\csname#1\endcsname\else
+	$\backslash$#1\fi}
+
+
+%\checklines	% 行送りを確認する時に使用
+\begin{document}%{
+% 和文表題
+\title[分散OS学習開発キット LP49]  %
+	{分散OS学習開発キット LP49}
+% 英文表題
+\etitle{An open source kit for studying and developing a distributed OS ``LP49''}
+
+% 所属ラベルの定義
+\affilabel{NII}{国立情報学研究所\\NII}
+\affilabel{Hitachi}{日立製作所\\Hitachi}
+% 和文著者名
+\author{丸山  勝巳\affiref{NII}\and
+	佐藤  好秀\affiref{Hitachi}}
+	
+% 英文著者名
+\eauthor{Katsumi Maruyama\affiref{NII}\and
+	Yoshihide Sato\affiref{Hitachi}}
+
+% 和文概要
+\begin{abstract}
+
+ 
+\end{abstract}
+
+% 英文概要
+\begin{eabstract}
+  Control systems (e.g. embedded systems, home servers) are becoming more and more sophisticated, 
+networked and complex. 
+Software productivity and dependability are the first concern of their design. 
+OS’s for control systems must support distributed processing, 
+fail-robustness and ease of program development. 
+LP49 is a component-oriented OS with micro-kernel and multi-server architecture. 
+We have adopted the L4 micro-kernel because of its performance and flexibility. 
+Plan 9 had devised excellent distributed processing facilities 
+(e.g. 9P protocol, private name space, user-mode servers), 
+and we have largely adopted concepts and source code from Plan 9. 
+LP49 component architecture will be effective to improve dependability.
+
+\end{eabstract}
+
+% 表題などの出力
+\maketitle
+
+%}{
+
+% 本文はここから始まる
+\section{はじめに}
+
+  今や組み込みシステムやホームサーバには、NW接続された多様な機器を連携動作させる
+分散処理機能が必須である。
+OSはシステムの性能(機能・効率・信頼性)のみならず
+プログラム開発コスト(開発しやすさ、開発期間・拡張性など)を大きく左右する。
+信頼性向上の近道はシンプル化であり、
+目的に最適な分散OSを作りたい人にはシンプルな分散OS開発キットは意義がある。
+
+  また、OSはソフトウェア技術の集大成であり、最高のソフトウェア教材である。
+学習用OSは、重要機能を含み、構成が簡明で、容易に機能追加でき、
+プログラム規模も小さいことが望まれる。
+学習用OSとしては、Minix が大変すぐれているが、
+残念ながら分散処理機能は目的としていない。
+
+このように、分散OSの適切な開発学習キットは大変意義が高い。
+本報告は、以上の観点から分散OS開発学習キットLP49について紹介する。
+
+%}{
+
+\section{本OS開発学習キットの意図}\label{sec:Enum}\label{sec:item}
+
+シンプルな分散OS開発学習キットに向けて以下を目指している。
+
+\begin{description}
+
+\item[制御システム(組込みシステム) やサーバに適したシンプルなＯＳ]
+      制御用、サーバ用に必要な機能をもったコンパクトな分散OS。
+    
+\item[障害に対する頑強性の強化 → マイクロカーネル＋マルチサーバ構成]
+    モノリシックOSでは部分障害 (例えばドライバのバグ) でもシステムクラッシュを導きがちである。
+     障害が生じても波及範囲を閉じ込めて部分再開を可能とするためには、
+%    以下の内容の
+    マイクロカーネル＋マルチサーバ構成の OSが有利である。
+%    (a) マイクロカーネル以外は、全てユーザモード（プロセッサの非特権命令）で実行させる。
+%    (b) 名前空間管理、ファイルサービスなどのいわゆるOSサービスは、
+%        個別のユーザモードプロセスとして実現し、個別再開を可能とする。
+%    (c) デバイスドライバ (OSクラッシュの原因の7割はドライバと言われる)も、
+%        ユーザモードで動作させる。
+    
+\item[拡張性の強化]
+    機能追加はユーザモードプロセスの追加などにて容易に行えるようにする。
+
+\item[システム連携の機能]
+   今後の組込みシステムには、
+   分散リソースの体系的な管理と制御、
+   ノード間での名前空間の可視化、
+   環境変数を含む動作環境の連携など
+   従来の分散OS以上の機能が要求されよう。
+
+  また、分散処理のプロトコルは、提供できる機能と性能を決定する。
+  独自プロトコルは強力であっても普及させることは難しい。
+  Plan9の{\bf 9Pプロトコル}は、
+  {\tt attach(), walk(),open(), create(), 
+  read(), write(), clunk(), remove(), stat(), wstat() }
+  等のメッセージからなり、
+  低レベル制御も可能で融通性が高いので、これを採用する。
+
+
+\item[プログラム開発の容易化]
+   モノリシックOSカーネルは、カーネル(特権)モードで動いている。
+   カーネルモードプログラムは、開発に高いスキルが必要でデバッグが大変難しい。
+   その上,小さなバグでもシステム全体がクラッシュしかねない。
+   本OSでは、マイクロカーネル以外は全てユーザモードプログラムとし、
+   ほとんどのサービスはユーザモードプロセスの追加で実現でき、
+   デバインスドライバもユーザモード化する。
+   これにより、プログラム開発が容易化・効率化される。
+
+\item[L4とPlan9のソースコード活用]  
+    OS全体をスクラッチから作るには、膨大な工数を要する。
+    Karlsruhe大学の L4 マイクロカーネルは、 
+    簡潔で優れたスレッド・メッセージ性能を持っている。
+    また、Bell研で開発された Plan9 は、融通性の高い分散処理を実現している。
+    かつ両者ともオープンソースであるので、ソースコードを活用して
+    工数削減をはかった。
+    
+\item[ソースコードの公開と使い慣れたプログラム開発環境]
+      OS を学習したり自前のOSを開発したい人に手頃なソースコードを提供する。
+    また, 使い慣れたGNU環境でコンパイルからテスト走行まで出きるようにする。
+
+\end{description}    
+
+%}{
+
+\section{プログラム構成}
+
+      LP49 は、図 \ref{fig:LP49general} に示すように以下の階層からできている。
+
+\begin{figure}[hbt]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{../fig/LP49general.eps}
+    \caption{LP49全体構成}
+    \label{fig:LP49general}
+  \end{center}
+\end{figure}
+
+
+\begin{description}
+\item[マイクロカーネル階層  (カーネルモード)]
+       L4 マイクロカーネルそのものであり、ここだけがカーネルモードで動作している。
+       マルチスレッド、タスク(=プロセス)論理空間、スレッド間通信、ページマップの
+       諸機能を提供している。
+    
+\item[HVM 階層 (ユーザモードプロセス)]
+     ユーザモードで走るL4プロセスである。
+     LP49 の立ち上げ、スレッド制御と論理空間制御、
+    並びにページフォールトの対処を行うスレッド ({\tt Pager}) を持っている。
+%
+    L4マイクロカーネルは、スレッドの実行中にpagefaultが生じると、
+    本{\bf Pager}スレッド にPagefaultメッセージを送る。
+   {\tt Pager} は pagefault メッセージを受信すると、
+   L4の page map機能を使って適切なページを割り当てる。
+   なお、応用プログラムは, page faultの処理をHVMの{\tt pager}に行わせても良いし、
+   自分独自のPagerを記述することも可能で、
+   ページキャッシュ、トランザクションメモリなど
+   融通性の高いメモリ管理も実装できる。
+
+
+    HVMという名前は、将来 Hypervisor Monitor 階層として Virtual Machine に発展させることを
+    考えて付けたが、現時点ではその機能は持っていない。
+
+    
+\item[Core階層  (ユーザモードプロセス)]
+     APLプロセスからシステムコール (実際にはメッセージ) を受けて、
+    所望の処理を行う。
+   また、必要に応じてサーバプロセスに処理を依頼する。
+   つまり、プロセスのシステムコールに対してはサーバ、
+   サーバプロセスに対してはクライアントとして機能する。
+%   
+    プログラムは、ユーザモードつまり非特権モードで走るので、安全性が高い。
+    デバイスドライバもここに含まれる。
+
+    
+\item[サーバ階層 (ユーザモードプロセス)]
+       OSサービスを行うファイルサーバー類も普通の応用プログラムも、
+     同等のユーザモードプロセスである。
+    ファイルサーバは、後述の様に 9P プロトコルを喋れる点がちがうだけである。 
+\end{description}
+
+
+%}{
+
+\section{サービスと抽象ファイル}
+
+\subsection{サービス提供：サーバとサーバント}
+
+  OSが提供するサービスには、
+  Dosファイルサービス、Ext2ファイルサービスといった高位サービスと、
+  ハードウェア駆動、モジュール間通信、NW接続、サーバ登録簿といった低位サービス
+  とがある。
+
+  前者は、個々に独立性が高く、規模も大きくなりがちなので、
+  サービス毎にユーザモードで走るプロセスとして実現する。これを{\bf サーバ}と呼ぶ。
+  サーバはメッセージインタフェースなので、ローカルでもリモートでも同等に使える。
+  ユーザモードプロセスなので、プログラム開発の容易化のみならず、
+  障害時もそのサーバだけを停止・再開することで耐障害性も強化される。
+
+  後者は共通機能的で、より実行速度が重視されるので、
+  独立したプロセスとはせず LP49core内のモジュールとして実装することとした。
+  このモジュールを{\bf サーバント}と呼んでいる。
+  サーバントは、統一インタフェースを持つコンポーネントである。
+  機能的には、同一サービスをサーバとして実装することも
+  サーバントとして実装することも可能である。
+
+   サーバもサーバントも、内部要素を登録する名前空間 (directry tree)
+   を持っており、
+   プロセスはそれを自分の名前空間にマウントすることにより、
+   普通のファイルインタフェースで目的要素にアクセスして、
+   内容の読み書き・制御を行える。
+
+    
+%%%%%
+{\bf\flushleft (1) サーバント}
+
+    サーバントはハードウェアデバイス, サーバ登録簿、環境変数記憶、
+  pipe, プロトコルスタックなど低位サービスを提供する。
+  サーバントはLP49coreプロセス内のモジュールであり、
+  attach(), init(), open(), read(), write(),,, といったプロシージャインタフェース
+  で呼ばれる。
+
+  各要素はサーバントの名前空間に登録されており、
+  ファイルインタフェースで操作できる。
+  サーバントは \verb|#+<英字>| の形式のサーバント識別子をもつ。
+  代表的サーバントを以下に示す。括弧内は サーバント識別子である。
+
+{\small
+\begin{quote}
+     コンソール(\verb|#c|), ハードディスク(\verb|#S|), フロッピーデバイス(\verb|#f|), 
+     環境変数 (\verb|#e|), サーバ登録簿(\verb|#s|), サーバマウント(\verb|#M|), 
+     Etherドライバ(\verb|#l|), 
+     プロトコルスタック(\verb|#I|), Pipe(\verb$#|$), ルートファイルシステム(\verb|#R|), 
+     USBホストコントローラ(\verb|#U|), VGAコントローラ(\verb|#v|),,,
+\end{quote}
+}
+
+``{\tt bind}''コマンドにより、サーバントをプロセスの名前空間に結合することにより、
+プロセスからサーバントにアクセスできるようになる。
+
+  \verb|  LP49[/]: bind [-abc]  サーバント名  マウントポイント|  \\
+
+
+{\bf\flushleft (2) サーバ}
+
+  サーバはサービスごとに独立したユーザモードのプロセスであり、
+  9Pメッセージ (9Pプロトコル)を受信してサービスを実行する。
+  LP49coreとサーバの間で9Pメッセージを運ぶ接続を{\bf サーバリンク}と呼んでいる。
+  サーバリンクは、
+  ローカルサーバの場合は pipe (LP49の pipe は 双方向である）、
+  リモートサーバの場合は TCP/IP 接続を用いる。
+
+  サーバは自分のサーバリンクを``サーバ登録簿''に登録しておく。
+  サーバ登録簿はサーバントの一つ(\verb|#s|)で、 
+  立ち上げ時に ``{\tt /srv}``として接続されている。
+  クライアントは、サーバ登録簿から目的のサーバを見つけて、
+  サーバリンク名(ex. {\tt /srv/dos}) を自分の名前空間にマウントする。
+  これにより、サーバの名前空間がクライアントの名前空間に接続され、
+  普通のファイルインタフェースでアクセスできるようになる。
+
+  \verb|  LP49[/]: mount [-abc]  サーバリンク名  マウントポイント  付加指定| \\
+
+
+%%%%%%%
+\subsection{抽象ファイルオブジェクト}
+
+Plan9と同様、LP49 では殆どのリソースを``ファイル''として抽象化している。
+個々の``抽象ファイル''は、サーバント内あるいはサーバ内に存在し、
+名前空間(directory tree)に登録されている。
+
+オブジェクト指向の観点からは、図 \ref{fig:VirtualFileObject}に示すように
+``抽象ファイル''はインスタンスオブジェクト、
+``サーバント定義''はクラス定義に相当する。
+各サーバントは同一のインタフェースを有する。
+
+\begin{figure}[hbt]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{../fig/VirtualFileObject.eps}
+    \caption{仮想ファイルのオブジェクトモデル}
+    \label{fig:VirtualFileObject}
+  \end{center}
+\end{figure}
+
+
+\begin{itemize}
+\item  各サーバントプログラムはクラス定義に相当し、
+  attach(), init(), open(), read(), write(),,, 等のメソッドコードを持ち、
+  メソッドテーブルを介して呼ばれる。
+\item  ``抽象ファイル''は、インスタンスオブジェクトであり、
+   サーバントの名前空間に登録されている。
+   以下では {\bf VF(抽象ファイル)オブジェクト}と呼ぶ。
+
+\item  VFオブジェクトは、qidという値によりサーバント内でユニークに識別される。
+       Qid は Unix の inode番号に相当する。
+
+\item  一般のオブジェクト指向言語と違って、同一クラス(サーバント)内でも
+       VFオブジェクトのデータ構成は同一とは限らない。
+       各メソッドはVFオブジェクトのqidから、そのデータ構成を判定し、
+       対応した処理を行う。
+
+\end{itemize}
+
+
+  LP49core内では、VFオブジェクトは{\bf オブジェクトハンドル}を介してアクセスされる。
+オブジェクトハンドル({\tt objH})は、サーバント識別情報({\tt typeフィールド}), 
+VFオブジェクトのqid ({\tt qidフィールド}), 
+その他の管理情報が載ったテーブルである
+\footnote{ Plan9 のソースコードを流用したので、
+プログラム上ではChan(nel)タイプのテーブルとなっている}。
+LP49coreは、
+オブジェクトハンドルの{\tt typeフィールド}からサーバントの各メソッドをアクセスし、
+{\tt qidフィールド}からインスタンスを決定する。
+%
+ここではVFオブジェクト $\alpha$ を指すオブジェクトハンドルを
+``{\tt objH\{$\alpha$\}}''と表記する。
+
+オブジェクトハンドルは、対象を{\tt open(), create()}した時や、
+change directory された時に割り当てられ、
+参照カウンタが 0 になったときに消去される。
+
+
+
+
+%%%%
+\section{システムコールの仕組み}
+
+\subsection{サーバントによる処理}
+
+  システムコールは、モノリシックOSでは一般にトラップを用いるが、
+マイクロカーネルOSではメッセージ通信を用いる。
+システムコールの仕組みを図 \ref{fig:LP49syscall}に示す。
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{../fig/LP49syscall.eps}
+    \caption{システムコール}
+    \label{fig:LP49syscall}
+  \end{center}
+\end{figure}
+
+{\bf (1) ライブラリによるL4メッセージ化}
+
+   APLのシステムコールは, 使い慣れた関数呼び出し (open(...), read(...), write(...) ,,,) 
+  である。
+  ライブラリは、これを L4 メッセージに変換して LP49core に送り、返答メッセージを待つ。
+  APLとLP49coreは別論理空間なので、アドレス引き継ぎは使えない。
+  システムコールの引数引き継ぎには、小サイズのデータはL4メッセージの値コピー, 
+  バッファー域はL4メッセージのページマップ機能を利用した。
+
+
+{\bf (2) LP49core マルチスレッドサーバ}
+
+    LP49coreは、APLのシステムコール処理に対してはサーバ、
+    サーバプロセスの9Pメッセージ処理に対してはクライアントとして機能する。
+    システムコール処理は中断が生じうるので、
+    複数要求を並行して処理するためにマルチスレッドサーバを実装した。
+    要求メッセージはMngrスレッドに送られる
+    (L4メッセージの宛先はスレッドである)。
+    Mngrスレッドは、スレッドプールから空きclerkスレッドを割り当てて、処理を行わせる。
+
+{\bf (3) 目的処理の実行}
+  
+    プロセス制御の場合には、プロセスマネジャーに処理を行わせる。
+
+    ファイル処理の場合には、サーバントが処理を行う。
+    サーバントを接続すると、そのルートを表す{\tt objH}テーブルが割り付けられる。
+    {\tt chdir}すると新場所を表す{\tt objH}テーブルが割り付けられる。
+    ファイルを{\tt create}あるいは{\tt open}すると、その{\tt objH}テーブルが割り付けられる。
+    オブジェクトの操作をする場合、その {\tt objH}テーブルにアクセスして、
+    サーバント(クラス)とオブジェクトを決定し、
+    サーバントのメソッドを呼び出して処理を行わせる。
+
+    分散処理の説明は、後に説明する。
+
+
+%%%%%%%%%
+\section{分散処理と名前空間}
+
+\subsection{サーバのマウント}
+
+{\bf\flushleft (1) サーバリンク}
+
+サーバとLP49coreの間で 9Pメッセージを運ぶ接続がサーバリンクである。
+サーバリンクは、ローカルサーバの場合はpipe, 
+リモートサーバの場合は TCP接続である。
+
+Pipeは pipeサーバント (\verb$#|$) のオブジェクト、
+TCP接続は IPサーバント (\verb|#I|) のオブジェクトであり、
+LP49core内では{\tt objH}テーブルによって表現される。
+
+
+
+{\bf\flushleft (2) サーバ登録簿}
+
+  サーバ登録簿(\verb|#s|)は目的サーバのサーバリンクを見つけるためのものであり、
+  初期設定により名前空間の ``{\tt /srv}'' に接続されている。
+  各サーバは、サーバリンクをサーバ登録簿サーバントに登録する。
+  例えば``{\tt /srv/ext2}''には、 
+  Ext2ファイルサーバのサーバリンクが記録されている。
+
+  クライアントは、サーバ登録簿から目的のサーバを見つけて、
+  これを自分の名前空間にマウントすることで、
+  サーバの持つ名前空間にアクセスできるようになる。
+
+{\bf\flushleft (3) サーバマウント}
+
+  例えば、次のコマンドはDOSファイルサーバ ({\tt /srv/dos})を使って、
+  HDD ({\tt /dev/sdC0})のDOS partition を
+  {\tt /c} にマウントする。
+
+\begin{verbatim}
+  [例] LP49[/]:  mount  -a  /srv/dos  /c  /dev/sdC0/dos 
+\end{verbatim}
+
+   サーバマウントの要となるのが、マウントサーバント(\verb|#M|)である。
+   マウントにより、マウントポイントを指す``{\tt objH\{マウントポイント\}}''テーブル
+   が割り当てられ、
+   {\tt type}フィールドにはマウントサーバントが、
+   {\tt mchan}フィールドには objH\{サーバリンク\}が、
+   {\tt qid}フィールドには qid値が設定される
+   (つまりマウントサーバントのオブジェクト)。
+   
+   {\tt objH\{マウントポイント\}}に対する操作は、
+   マウントサーバントによって9Pメッセージに変換され、
+   サーバリンクを通してサーバに送られ、
+   そこで所望の処理が行われる。
+   つまり、本{\tt objH}テーブルはサーバ内の本体オブジェクトの{\bf Proxyオブジェクト}
+   として機能している。
+
+   同様にサーバ上のオブジェクトを{\tt create}あるいは{\tt open}すると、
+   それに対応したProxyオブジェクトが割り当てられる。
+   このようにしてサーバ上のオブジェクトもローカルと同じようし操作できる。
+
+\subsection{サーバアクセス処理の具体例}
+
+ サーバの``{\tt /}'' をプロセスの名前空間``{\tt /c}''にマウントし、
+``{\tt /c}'' 及び ``{\tt /c/x/y}''  にアクセスした場合の処理内容を
+図\ref{fig:RemoteAccess}に示す。
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{../fig/RemoteAccess2.eps}
+    \caption{リモートオブジェクトアクセス}
+    \label{fig:RemoteAccess}
+  \end{center}
+\end{figure}
+
+
+\begin{enumerate}
+\item サーバ登録簿への登録:  
+  サーバ登録簿にサーバリンクを登録することにより、
+  ``{\tt objH\{サーバリンク\}}'' (図の$\sigma$)が割り当てられる。
+
+\item サーバのマウント: 
+   {\tt mount}コマンドによりサーバをマウントする。\\
+   \verb| LP49[/]: mount  -ac  /srv/dos  /c  /dev/sdC0/dos|
+
+   {\tt /srv/dos}はサーバリンクを,
+   {\tt /c }はマウントポイントを,
+   {\tt /dev/sdC0/dos} はサーバ名前空間のマウント開始位置を、
+   {\tt -ac}は書き込み可能でafterにマウントすることを意味する。  
+
+  これにより、サーバとの間で{\tt attach}メッセージなどのやり取りを行い、
+  ``{\tt objH\{/c\}}'' (図の$\gamma$)テーブルを割り当て、以下の設定を行う。
+  \begin{itemize}
+    \item  typeフィールドには Mntサーバントを設定。
+          つまり、objH\{/c\}のクラスをMntサーバントである。
+    \item  mchanフィールドには {\tt objH\{サーバリンク\}}を設定。
+    \item  qidフィールドには サーバからもらった{\tt qid}を設定。
+          この{\tt qid}は、サーバ内のマウント開始位置オブジェクトの{\tt qid}である。
+  \end{itemize}
+  
+    以上により、{\tt objH\{/c\}}は、サーバ内のマウント開始位置オブジェクト(図の$\alpha$)
+    の{\bf Proxyオブジェクト}となる。
+    こうして、{\tt objH\{/c\}}への操作はマウントサーバントによって
+    {\bf 9P メッセージ}に変換され、サーバリンクに送り出される。
+   サーバからの返答を受けたらそれをクライアントに返す。
+
+\item サーバ名前空間での操作:  
+   例えば {\tt /c} にて``{\tt open("x/y", OREAD)}'' を実行したとする。
+   この場合は、サーバとの間で {\tt walk, open}メッセージなどをやり取りして、
+   ``{\tt objH\{/c/x/y\}}'' (図の$\delta$)テーブルを割り当て、以下の設定を行う。
+  \begin{itemize}
+    \item  typeフィールドには マウントサーバントを設定。
+    \item  mchanフィールドには {\tt objH\{サーバリンク\}}を設定
+    \item  qidフィールドには サーバからもらった{\tt qid}を設定。
+       この{\tt qid}は、サーバ内の{\tt /b/c/d}オブジェクト(図の$\beta$)の{\tt qid}である。
+  \end{itemize}
+
+    以上の設定により、{\tt objH\{/c/x/y\}}は、サーバ内の{\tt /x/y}オブジェクト
+    の Proxyオブジェクトとなる。
+
+\end{enumerate}
+
+
+
+\subsection{離れた名前空間の可視化}
+
+リモートノードの任意の部分空間
+(そこには複数のサーバントやサーバが接続されていてもよい)
+を、自プロセスの名前空間にマウントすることができる。
+Plan9 から移植した{\tt extfs}サーバと{\tt import}コマンドが、これを実現する。
+
+{\tt extfs}サーバは、指定された部分名前空間を外部ノードにexportするサーバ、
+{\tt import}コマンドはそれを自分の空間にマウントするコマンドである。
+
+例えばリモートホストの {\tt /dev} ディレクトリーをローカルホストにマウントすると、
+{\tt /dev} に接続されているリソースにアクセスすることが可能になる。
+全てのオブジェクトはファイルインタフェースで操作できるので、
+このことはリモートホストのデバイスも操作できることを意味する。
+
+同様にして、U9FS というプログラムをUnix上で走らせることにより、
+UNIXのファイルシステムの部分空間を LP49 上にマウントすることも可能である。
+U9FSはUNIXで9Pプロトコルを理解するプログラムで、
+Plan9ユーザグループから移植した。
+
+
+
+\subsection{名前空間の機構}
+
+図 \ref{fig:NS-server-servant} に示すように、サーバントやサーバは、
+ルートファイルシステム{\bf RootFS}(これもサーバント)を出発点とする名前空間に
+接続（マウント）することにより、プロセスに見えるようになる。
+Plan9同様に、同一マウントポイントに複数をマウントすることが可能である(unionマウント)。
+``/dev'' には各種デバイスサーバントが、``/net''にはプロトコルスタックが接続されている。
+
+  UNIXではファイルシステムの mount は root 権者のみが行え、
+  名前空間は全プロセスで共通である。
+  これに対し、Plan9/LP49 の名前空間は、
+  各プロセス毎に自前の名前空間（{\bf 個別名前空間}）を持つことができる。
+  名前空間に見えないものはアクセスできないので、緻密なセキュリティー管理を
+  実現できる。
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{../fig/NS-server-servant.eps}
+    \caption{サーバ、サーバントと名前空間}
+    \label{fig:NS-server-servant}
+  \end{center}
+\end{figure}
+
+
+名前空間の構成法を図 \ref{fig:NSmount} に示す。
+図中の(a)では、
+指定されたマウントポイントにサーバントを結合 (bind) することにより、
+サーバントの名前空間がプロセスの名前空間に接続され、
+サーバントのサービスを受けられるようになる。
+
+同様に(b)では、サーバーをマウント (mount) することにより、
+サーバの名前空間がプロセスの名前空間に接続され、  
+サーバのサービスを受けられるようになる。    
+サーバは remote procedure call で呼び出されるので、
+自ホスト内(b)でもリモートホスト上(c)でも、
+同様にアクセスできる。
+
+また、(d)は{\tt extfsサーバ}と{\tt importコマンド}をにより、
+別ノードの``部分''名前空間をマウントしている。
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=340pt
+   \epsfbox{../fig/NSmount.eps}
+    \caption{名前空間とマウント}
+    \label{fig:NSmount}
+  \end{center}
+\end{figure}
+
+
+%%%
+\subsection{プロトコルスタック}
+
+  Plan9のプロトコルスタックはモジュール化されており、
+  比較的軽い修正でLP49 に移植しえた。
+
+  インターネットサービスは、図 \ref{fig:NWservants} に示すように
+  IPサーバント(``{\tt \#I}'')が提供している。
+  IPサーバントの下では、
+  TCP, UDP, IP など各プロトコル毎にモジュール化されたプログラムが動作しており、
+  ユーザには以下のトリー構成をもつファイルシステムとして見える。
+  IPサーバントは ``{\tt /net}''に接続され、個々の接続もファイルインタフェースを持つ。
+  例えばTCP接続は、{\tt /net/tcp/0, /net/tcp/1 ,,,} として名前空間に見える。
+
+
+{\footnotesize
+\begin{verbatim}
+        --+- tcp/ ----+- clone                        
+          |           |- stats                
+          |           |- 0/ ---+- ctl          
+          |           |        |- data     
+          |           :        |- local    
+          |           :        |           
+          |                               
+          |- udp/ ---+- clone                        
+          |          |- stats                  
+          |          |- 0/ ---+- ctl            
+          |          |        |-data     
+          |          :        |-local    
+          |          :        |           
+          |                                              
+          |-- arp/ ----
+\end{verbatim}
+}
+
+
+Etherサーバント(\verb|#l|)は、Ether card のサービスインタフェースであり、
+該当した Ether driver を呼び出している。
+
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=240pt
+   \epsfbox{../fig/NWservants.eps}
+    \caption{IPサーバントとEtherサーバント}
+    \label{fig:NWservants}
+  \end{center}
+\end{figure}
+
+
+
+%}{
+\section{本OSキットの開発環境展}
+
+OSの開発および学習には、使い慣れた開発環境が望まれる
+(Plan9が普及が遅れている理由には独自の開発環境もある)。
+またOSの走行テストも、NW機能を含めて実機の前に仮想マシンで行えることが望まれる、
+
+LP49のプログラム開発はLinuxホスト上の GNUツールだけで、
+LP49の走行テストはオープンソースエミュレータ Qemu で行っている。
+%  (図 \ref{fig:SDE})。
+Qemu はネットワーク機能も提供しており、
+1台のホストマシン上で、
+NW接続した複数のLP49を走らせることも、
+LP49とLinuxホスト間をNW接続するとも可能である。
+1台のホストマシン上で、コンパイルからNWを含む走行試験まで
+時間を待たずに(全makeでも30秒、LP49立ち上げに10秒)できるので、大変快適である。
+
+\begin{comment}
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=400pt
+   \epsfbox{../fig/SDE.eps}
+    \caption{開発試験環境}
+    \label{fig:SDE}
+  \end{center}
+\end{figure}
+\end{comment}
+
+%}{
+%%%%%
+\section{本OSキットによる展開例}
+
+{\bf\flushleft (1) サーババス}
+
+LP49では、OSサービスはサーバもしくはサーバントによって提供される。
+LP49coreは、サーバント・サーバのマルチプレクサと
+APLとサーバやサーバとの間を連携させるメッセンジャーに徹しており、
+これがシンプル化に結びついている。
+ただし、現方式ではシステムコールは全て LP49core を経由して処理されるが、
+目的サーバが決まってしまえばAPLとサーバの間で直接メッセージをやり取りさせることもできる。
+具体的には、目的サーバの決定に関わるopen(), create(), chdir()、close() を
+LP49coreが処理してAPL-サーバ間を安全なチャネルで接続させる。
+つまりOSはサーバを接続するための広域バスとすることが可能で、
+この形態が本研究の最終目的である。
+
+また、9Pプロトコルは同期型メッセージであるが、
+広域分散をより効率的に行うためには
+非同期型メッセージのサポートが有効と思われる。
+
+% 非同期メッセージの拡張として、サーバを関数型言語 Erlang で実装することも
+% 考えられる。
+
+
+\begin{comment}
+図 \ref{fig:simpleOS}
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=400pt
+   \epsfbox{../fig/simpleOS.eps}
+    \caption{簡明なOS構成}
+    \label{fig:simpleOS}
+  \end{center}
+\end{figure}
+\end{comment}
+
+
+{\bf\flushleft (2) 耐障害強化}
+
+プロセスを監視し、障害が見つかればそれを停止して再スタートする仕組みを
+容易に組み込める。
+また、簡単なPagerの機能追加により、プロセスに保持メモリ域を追加することができる。
+保持メモリ域には、プロセスが指定した適当なタイミングで
+無矛盾なデータのスナップショットを書き込んでおく。
+プロセスが障害になった場合には、保持メモリ域のデータを使って再開させることにより、
+比較的安全なrolebackを行える。
+
+
+{\bf\flushleft (3) 高性能化}
+ 
+現LP49には、高性能化の仕組みは殆ど組み込んでない。
+スレッドの優先度制御、ページキャッシュ、システムコール引数引き継ぎ等の改良で
+容易に高性能化を図ることができる。
+Pagerは作り直しを予定しており、この際に簡単なページキャッシュを実現する予定である。
+
+
+
+\subsection{認証システム}
+
+分散OSにおいて認証は非常に重要な課題である。
+Plan9はKerberos を拡張した精妙な認証方式を実装しているが、学習用としては複雑である。
+LP49では,Identity-Based Encryptionを使用した認証方式を検討している。
+
+
+%%%%%%%%%%%
+%}{
+
+\section{関連研究}
+
+% {\bf\flushleft (1) Plan 9}
+
+分散処理機能の観点からは、LP49はPlan9を延長した学習開発実験キットとも云える。
+Plan9のソースコードをできる限り活用することとしたが、
+実際にはかなりの変更を必要とした(表 \ref{table:LP49-Plan9})。
+マイクロカーネル化に伴い、プロセス・スレッド機能とシステムコール機構は
+全面的に変更を要した。
+プログラム構造的には、マイクロカーネルによる障害保護強化、
+サーバントによる部品化強化などを行った。
+また、Plan9のサーバとドライバプログラムを少しの修正で移植できる。
+9Pプロトコルの採用により、
+少ない修正でPlan9のサーバをLP49に移植できるという利点もある。
+
+Plan9が魅力的な内容にも関わらずハッカーが限られているのは、
+オープンソース化の遅れとともに、独自のC言語と開発環境が理由と思われる。
+特に構造体の無名フィールド (フィールド名を省略でき、
+その場合コンパイラがデータタイプから目的フィールドを自動的に探す）
+が多用されており、ANSIコンパイラに通らないのみならず、
+プログラム解読も難しくしている。
+LP49では、プログラム修正も行いGNU環境で開発できるようにした。
+\footnote{GCCへのPlan9-C仕様の追加も考えたが、GCCは改版が頻繁なので断念した.}
+
+
+\begin{table}[htb]
+\caption[Plan9vsLP40]{LP49とPlan9の対比 }
+\label{table:LP49-Plan9}
+\begin{center}
+{\footnotesize 
+\begin{tabular}{|l|l|l|}
+\hline
+ 分類  & Plan 9 & LP49 \\
+\hline
+
+Micro kernel  &     No        &   Yes   \\
+\hline
+
+並行処理  &  プロセスはコルーチン、 &   L4 Process  \\
+          &  スレッドはメモリ域共用のプロセス &  L4 Thread \\
+\hline
+
+システムコール    & Trap       &     L4 メッセージ \\
+                  & カーネル＋ユーザプロセス    & マルチスレッドサーバ \\
+\hline
+
+〃データ入力      & Plan9カーネルが   & L4ページマップ \\
+〃データ出力      & APL空間を直接アクセス          & L4 ページマップ \\
+\hline
+
+ドライバ     & カーネルモード    & ユーザモード  \\
+\hline
+
+言語仕様 &  Plan9独自のC                     &   GCC    \\
+         &  無名フィールド, 無名パラメータ   & \\
+         &  typedef, USED(), SET()           &    \\
+         &   \#pragma, 自動ライブラリリンク  & \\
+\hline
+
+コンパイラ  &   Plan9 独自Cコンパイラ   &   GCC \\
+\hline
+
+ Utility  &  Plan9 の Linker, Assembler, mk    & GCC, gld, gmake \\
+\hline
+
+Binary    &  a.out形式         &    ELF形式 \\
+\hline
+
+\end{tabular}
+}
+\end{center}
+\end{table}
+
+
+{\bf L4}は, LP49が採用したマイクロカーネルである。
+使い方も容易で、何ら機能追加や修正をすることなく活用できた。
+
+
+{\bf Minix} は学習用マイクロカーネルOSとして、非常に意義が高い。
+LinuxはMinixから影響を受けて開発されたが、マイクロカーネルは採用されなかった。
+全カーネルデータが見えるモノリシックOSの方が作り易いし効率も良いという主張に一理はあるが、
+障害に対する頑強性、プログラム保守性はマイクロカーネルが有利である。
+Minix は分散OS機能は範囲外である。
+
+
+{\bf SawMil}はIBM で実施されたL4 マイクロカーネルと
+マルチサーバからなるOS の研究プロジェクトである。
+Linux カーネルをサービス対応にモジュール分けしてマルチサーバ化することを
+狙ったが、Linuxカーネルはモジュール分割が困難のため、
+プロジェクトは中座した。
+
+{\bf $L^4Linux$}は、L4 マイクロカーネルの上でLinux を動かすOSである。
+Linux はモノリシック構成のままであり、L4を使ったVirtual Machine といえる。
+
+GNU の{\bf Hurd} は、古くから挑戦しているマイクロカーネルOSである。
+マイクロカーネルとしては {\bf Mach}を採用していたが、
+効率の観点から最近は L4 マイクロカーネルを採用した{\bf L4-Hurd}を検討している。
+Unix互換が目標であり、分散OSを目指したものではない。
+
+
+%}{
+
+\section{おわりに}
+
+
+LP49の詳細な資料とソースコードは、WEBサイト 
+http://research.nii.ac.jp/H2O/LP49  にて公開している。
+
+{\bf (1) 学習用OSとしての観点}
+
+  コメントを含むソース規模は、  
+  HVM: 約２K行、LP49core: 約60K行(内20K行がプロトコルスタック)、
+  libcライブラリ: 約30K行、その他のライブラリ:x K行、
+  rcシェル: 約8K行、デバッグシェル: 2K行、DosFS: 40K行、Ext2FS: 30K行、
+  extfs: 2K行である。
+機能に比べて充分にコンパクトであり、一人で全てをトレースできる。
+本キットにより、LP49だけでなく Plan9とL4のプログラム技術も理解できる。
+
+
+{\bf (2) 分散OS開発キットとしての観点}
+
+現LP49の測定値は以下の通りである(実機はPentium3 1GHz, Qemu走行はPentium4 2.8GHz, Dedora8)。
+
+Qemu上のLP49 -- LP49間のping時間： 4.7ms. 
+Qemu上のLP49 -- Linux/host間のping時間： 0.7ms. 
+Qemu上のLP49 -- LP49間のリモートファイル(1KB)読み出し時間： 40ms. 
+Qemu上のLP49のCDファイル(1KB)読み出し時間： 690μ sec.(初回は 25ms). 
+実機上のLP49のCDファイル(1KB)読み出し時間： 120μ sec.(初回は 110ms). 
+Qemu上のLP49のRAMファイル(50B)読み出し時間： 180μ sec.
+Qemu上のLP49のRAMファイル(4KB)読み出し時間： 220μ sec.
+実機上のLP49のRAMファイル(50B)読み出し時間： 31μ sec.
+実機上のLP49のRAMファイル(4KB)読み出し時間： 48μ sec.
+
+まだ最適化は行っていないので性能的には充分とはいえないが、
+前述のスレッド優先度制御、ページキャッシュなどを導入することで、性能は向上できる。
+
+大部分の機能追加はサーバ追加で行えること、
+サーバはユーザプロセスなので開発が容易なことなどの利点がある。
+
+
+{\bf (3) 今後の予定}
+
+公開ソースコードのリファインを進めて、より簡潔で理解し易くするとともに、
+障害プロセスの停止再会機構と最適化を進める予定である。
+そのあと更に簡潔な広域サーババスの実装を行う。
+
+
+\begin{acknowledgment}
+.....の皆様に，謹んで感謝の意を表する．
+\end{acknowledgment}
+
+%}{
+
+\begin{thebibliography}{10}
+
+\bibitem{L4}
+J. Lidtke: {\em On micro-Kernel Construction}, 
+Proc. of IEEE International Workshop on Object-Orientation in Operating Systems (IWOOOS), (1996). 
+
+\bibitem{L4}
+Karlsruhe univ. : {\em L4 Web site}, 
+http://l4ka.org/ .
+
+
+\bibitem{plan9}
+Rob Pike, et. al. ： {\em Plan 9 from Bell Labs}， ...... (1991).
+
+\bibitem{plan9HP}
+Bell labs.： {\em Plan 9 Web site}， 
+http://plan9.bell-labs.com/plan9/
+
+\bibitem{Minix}
+A. Tannenbaum \& A. Woodhull： {\em Operating systems design and implementation,3/E}, 
+Addison-Weisley， (2000).
+
+\bibitem{MinixHP}
+www.minix3.org.：{\em Minix  Web site}， 
+http://www.minix3.org/
+
+\bibitem{LP49HP}
+$H_2O$： {\em LP49  Web site}， 
+http://research.nii.ac.jp/H2O/LP49/
+
+\bibitem{xkernel}
+N. C. Hutchinson \& L. L. Peterson: {\em The x-Kernel: An architecture for implementing network protocols},  IEEE Transactions on Software Engineering, 17(1), Jan. 1991. 
+
+\bibitem{Erlang}
+Joe Armstrong: {\em Making reliable distributed systems in the presence of hardware errors}, 博士論文 (Ph.D.) 、スウェーデン王立ストックホルム工科大学, 2003.
+
+\bibitem{Singularity}
+G. Hunt. et. al.: {\em An overview of the Singularity Project},
+Microsoft research technical report MSR-TR-2005-135, 2005.
+
+\end{thebibliography}
+
+%}{
+
+\begin{biography}
+\member{丸山  勝巳}
+..............
+%
+\member{佐藤 好秀}
+.......
+\end{biography}
+\end{document}

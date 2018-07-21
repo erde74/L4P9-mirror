@@ -1,0 +1,200 @@
+struct Lock
+{
+        ulong   key;
+        ulong   sr;
+        ulong   pc;
+        Proc    *p;
+        Mach    *m;
+        ushort  isilock;
+};
+ 
+
+
+struct Rendez
+{
+        Lock    _lock;  //%
+        Proc    *p;
+};
+
+
+
+
+void sleep(Rendez *r, int (*func)(void*), void *arg)  //% L4
+{
+    L4_ThreadId_t  from;
+    L4_MsgTag_t   tag;
+    if ((*func)(arg) == 0) {
+        r->p = (Proc*)L4_Myself().raw;  //Type
+        tag = L4_Wait_Timeout(L4_Never, &from);
+    }
+}
+
+
+
+MR0:  ESI
+MR1:  EBX
+MR2:  EBP
+
+
+00a17a3e <sleep>:
+  a17a3e:       push   %ebp
+  a17a3f:       mov    %esp,%ebp		EBP := FramePointer
+  a17a41:       push   %edi			Save EDI
+  a17a42:       push   %esi			Save ESI
+  a17a43:       push   %ebx			Save EBX
+  a17a44:       sub    $0x18,%esp
+
+  a17a47:       pushl  0x10(%ebp)               Push arg,       arg=Frame[16]
+  a17a4a:       call   *0xc(%ebp)               Call func(arg), func=Frame[12]
+  a17a4d:       mov    %eax,%ecx		ECX := EAX := func(arg)
+  a17a4f:       add    $0x10,%esp
+
+  a17a52:       test   %eax,%eax                IF (EAX /= 0)
+  a17a54:       jne    a17a84 <sleep+0x46>      GOTO  Label 
+
+  a17a56:       mov    %gs:0x0,%eax             EAX := & UTCB<0>
+  a17a5c:       mov    0xffffffc4(%eax),%edx    EDX := myGlobalTID  : UTCB<-60>
+
+  a17a5f:       mov    0x8(%ebp),%eax           EAX := r (Rendezvous) ; UTCB<8>
+  a17a62:       mov    %edx,0x18(%eax)          r->p := myGlobalTID
+
+  a17a65:       mov    $0xffffffff,%edx	  	EDX := -1 
+  a17a6a:       mov    %gs:0x0,%edi		EDI := & UTCB<0>
+
+  a17a71:       mov    (%edi),%esi		ESI := UTCB<0> = myLocalID ?
+
+  a17a73:       mov    %ecx,%eax		EAX := ??
+
+  a17a75:       push   %ebp			Save EBP	
+
+						EAX = to = 0
+						ECX = Timeout
+						EDX = from = -1
+						ESI = MR0
+						EDI = UTCB
+						EBX, EBP, ESP = -
+
+  a17a76:       call   a6e000 <__L4_Ipc>	L4_Ipc(0:nilthread, -1:anythread, 
+	                                               L4_Never, &from)
+
+						EAX = from
+						ECX = -
+						EDX = -
+						ESI = MR0
+						EDI = 
+						EBX = MR1
+						EBP = MR2
+						ESP = 
+
+ 
+  a17a7b:       mov    %ebp,%ecx		ECX := MR2
+
+  a17a7d:       pop    %ebp			Recover EBP
+
+
+  a17a7e:       mov    %ebx,0x4(%edi)		MR1 := EBX = MR1
+  a17a81:       mov    %ecx,0x8(%edi)		MR2 := ECX = MR2
+
+
+Label:
+  a17a84:       lea    0xfffffff4(%ebp),%esp   	ESP := EBP<-12>
+
+  a17a87:       pop    %ebx
+  a17a88:       pop    %esi
+  a17a89:       pop    %edi
+  a17a8a:       leave
+  a17a8b:       ret
+
+
+//--------------------------------------------------------
+Proc* wakeup(Rendez *r)   //% L4
+{
+    L4_ThreadId_t whom;
+    L4_Msg_t msgreg;
+    L4_MsgTag_t tag;
+  
+    whom.raw = (unsigned)r->p;  //Type...
+  
+    l4printf_c(6, "!%x ", THNR(r->p));  //?DBG
+ 
+    L4_MsgClear(&msgreg);
+    L4_Set_MsgLabel(&msgreg, 7);
+    L4_MsgLoad(&msgreg);
+  
+    tag = L4_Send(whom);
+    if (L4_IpcFailed(tag)) {
+        l4printf_c(6, "#%d ", L4_ErrorCode());
+ 
+    }
+    return (Proc*) whom.raw;
+}
+
+00a17ac9 <wakeup>:
+  a17ac9:       push   %ebp
+  a17aca:       mov    %esp,%ebp
+  a17acc:       push   %edi
+  a17acd:       push   %esi
+  a17ace:       push   %ebx
+  a17acf:       sub    $0x130,%esp
+  a17ad5:       mov    0x8(%ebp),%eax
+  a17ad8:       mov    0x18(%eax),%eax
+  a17adb:       mov    %eax,0xfffffee4(%ebp)
+  a17ae1:       shr    $0xe,%eax
+  a17ae4:       and    $0xff,%eax
+  a17ae9:       push   %eax
+  a17aea:       push   $0xa5f542
+  a17aef:       push   $0x6
+  a17af1:       call   a59ef1 <l4printf_c>
+  a17af6:       add    $0x10,%esp
+  a17af9:       movl   $0x0,0xfffffee8(%ebp)
+  a17b00:       00 00 00
+  a17b03:       movw   $0x7,0xfffffeea(%ebp)
+  a17b0a:       07 00
+  a17b0c:       movzbl 0xfffffee8(%ebp),%eax
+  a17b13:       mov    %eax,%edx
+  a17b15:       and    $0x3f,%edx
+  a17b18:       mov    0xfffffee8(%ebp),%eax
+  a17b1e:       shr    $0x6,%ax
+  a17b22:       and    $0x3f,%eax
+  a17b25:       lea    0x1(%eax,%edx,1),%edx
+  a17b29:       lea    0xfffffee8(%ebp),%ebx
+  a17b2f:       mov    %gs:0x0,%ecx
+  a17b36:       mov    %edx,%eax
+  a17b38:       dec    %edx
+  a17b39:       test   %eax,%eax
+  a17b3b:       jle    a17b4e <wakeup+0x85>
+  a17b3d:       mov    (%ebx),%eax
+  a17b3f:       mov    %eax,(%ecx)
+  a17b41:       add    $0x4,%ebx
+  a17b44:       add    $0x4,%ecx
+  a17b47:       mov    %edx,%eax
+  a17b49:       dec    %edx
+  a17b4a:       test   %eax,%eax
+  a17b4c:       jg     a17b3d <wakeup+0x74>
+  a17b4e:       mov    $0x0,%ecx
+  a17b53:       mov    %gs:0x0,%edi
+  a17b5a:       mov    (%edi),%esi
+  a17b5c:       mov    0xfffffee4(%ebp),%eax
+  a17b62:       mov    %ecx,%edx
+  a17b64:       push   %ebp
+  a17b65:       call   a6c000 <__L4_Ipc>
+  a17b6a:       mov    %ebp,%ecx
+  a17b6c:       pop    %ebp
+  a17b6d:       test   $0x8000,%esi
+  a17b73:       je     a17b90 <wakeup+0xc7>
+  a17b75:       mov    %gs:0x0,%eax
+  a17b7b:       sub    $0x4,%esp
+  a17b7e:       pushl  0xffffffdc(%eax)
+  a17b81:       push   $0xa5f547
+  a17b86:       push   $0x6
+  a17b88:       call   a59ef1 <l4printf_c>
+  a17b8d:       add    $0x10,%esp
+  a17b90:       mov    0xfffffee4(%ebp),%eax
+  a17b96:       lea    0xfffffff4(%ebp),%esp
+  a17b99:       pop    %ebx
+  a17b9a:       pop    %esi
+  a17b9b:       pop    %edi
+  a17b9c:       leave
+  a17b9d:       ret
+
+                                                                                                     

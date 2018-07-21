@@ -1,0 +1,231 @@
+This is pTeX, Version 3.141592-p3.1.10 (utf8.euc) (Web2C 7.5.4) (format=platex 2009.4.6)  25 JUN 2009 18:20
+**kitOS
+(./kitOS.tex
+pLaTeX2e <2006/11/10>+0 (based on LaTeX2e <2003/12/01> patch level 0)
+(./ipsjpapers.cls
+Document Class: ipsjpapers 2008/12/29 ver 3.01
+(./ipsjpapers.sty
+\old@latex@skip=\skip41
+\@Q=\dimen118
+\jfsize=\count81
+\jspaceskip=\dimen119
+\@mojihaba=\dimen120
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <9> on input line 584.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <6> on input line 584.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <5> on input line 584.
+\@abstractbox=\box41
+\@eabstractbox=\box42
+\@titlewidth=\dimen121
+\mkt@prevdepth=\dimen122
+\mkt@titlebox=\box43
+\mkt@cnta=\count82
+\mkt@cntb=\count83
+\mkt@sname=\count84
+\mkt@gname=\count85
+\mkt@boxa=\box44
+\mkt@namewidth=\dimen123
+\InterAuthorSkip=\dimen124
+\c@affi@footnote=\count86
+\c@affi@pfootnote=\count87
+\c@volpageoffset=\count88
+\c@volume=\count89
+\c@number=\count90
+\c@month=\count91
+\c@year=\count92
+\@leftcolumnfootnote=\box45
+\@rightcolumnfootnote=\box46
+\opt@baselineskip=\skip42
+\bio@picbox=\box47
+\bio@colht=\dimen125
+\bio@splitheight=\dimen126
+\bio@maxgap=\dimen127
+\bio@lastgap=\dimen128
+\bio@th=\dimen129
+\bio@lhA=\dimen130
+\bio@hA=\dimen131
+\bio@hB=\dimen132
+\bio@lh=\dimen133
+\bio@rh=\dimen134
+\bio@tempdim=\dimen135
+\bio@pbox=\insert233
+ (./ipsjcommon.sty
+\c@section=\count93
+\c@subsection=\count94
+\c@subsubsection=\count95
+\c@paragraph=\count96
+\c@subparagraph=\count97
+\bib@adjustheight=\dimen136
+\c@figure=\count98
+\c@table=\count99
+\cap@linewidth=\dimen137
+\cap@hsize=\dimen138
+\cap@prevgraf=\count100
+\cap@box=\box48
+\PF@fnotectr=\count101
+\PF@page=\count102
+\adj@boxa=\box49
+\adj@boxb=\box50
+\adj@height=\dimen139
+\adj@deadcycle=\count103
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <10> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 893.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <10> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 893.
+)))
+(/usr/local/teTeX/share/texmf-dist/tex/generic/epsf/epsf.tex
+This is `epsf.tex' v2.7k <10 July 1997>
+\epsffilein=\read1
+\epsfframemargin=\dimen140
+\epsfframethickness=\dimen141
+\epsfrsize=\dimen142
+\epsftmp=\dimen143
+\epsftsize=\dimen144
+\epsfxsize=\dimen145
+\epsfysize=\dimen146
+\pspoints=\dimen147
+\epsfnoopenhelp=\toks15
+) (./comment.sty) (./mediabb.sty
+Package: mediabb 2006/10/26 v1.9 iNOUE Koich! <inoue@ma.ns.musashi-tech.ac.jp>
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/graphicx.sty
+Package: graphicx 1999/02/16 v1.0f Enhanced LaTeX Graphics (DPC,SPQR)
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 1999/03/16 v1.13 key=value parser (DPC)
+\KV@toks@=\toks16
+)
+(/usr/local/teTeX/share/texmf/tex/latex/graphics/dvipdfmx-contrib-latex/graphic
+s.sty
+Package: graphics 2001/07/07 v1.0n Standard LaTeX Graphics (DPC,SPQR)
+ (/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/trig.sty
+Package: trig 1999/03/16 v1.09 sin cos tan (DPC)
+)
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/graphics.cfg
+File: graphics.cfg 2005/02/03 v1.3 graphics configuration of teTeX/TeXLive
+)
+Package graphics Info: Driver file: dvipdfm.def on input line 81.
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/dvipdfm/dvipdfm.def
+File: dvipdfm.def 1999/9/6 vx.x Driver-dependant file
+))
+\Gin@req@height=\dimen148
+\Gin@req@width=\dimen149
+))
+(./kitOS.aux
+
+LaTeX Warning: Label `L4' multiply defined.
+
+)
+\openout1 = `kitOS.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for JY1/mc/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Checking defaults for JT1/mc/m/n on input line 40.
+LaTeX Font Info:    ... okay on input line 40.
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <14.4> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 81.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <14.4> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 81.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <10.95> on input line 81.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <8> on input line 81.
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <12> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 81.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <12> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 81.
+
+
+Class ipsjpapers Warning: \etitle is too wide. Break line(s) by \\ on input lin
+e 81.
+
+
+LaTeX Font Warning: Font shape `JT1/mc/m/sc' undefined
+(Font)              using `JT1/mc/m/n' instead on input line 81.
+
+
+LaTeX Font Warning: Font shape `JY1/mc/m/sc' undefined
+(Font)              using `JY1/mc/m/n' instead on input line 81.
+
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <7> on input line 81.
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <9> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 112.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <9> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 112.
+
+Overfull \hbox (26.1967pt too wide) in paragraph at lines 136--143
+\OT1/cmtt/m/n/9 walk(),open(), create(), read(), write(), clunk(), remove(), st
+at(), wstat()
+ []
+
+LaTeX Font Info:    Try loading font information for OMS+cmr on input line 161.
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/base/omscmr.fd
+File: omscmr.fd 1999/05/25 v2.5h Standard LaTeX font definitions
+)
+LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <8> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 161.
+ [1234
+
+]
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <7> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 178.
+LaTeX Font Info:    Font shape `JY1/mc/bx/n' in size <7> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 178.
+ [1235]
+[1236]
+LaTeX Font Info:    Try loading font information for OMS+cmtt on input line 360
+.
+LaTeX Font Info:    No file OMScmtt.fd. on input line 360.
+
+
+LaTeX Font Warning: Font shape `OMS/cmtt/m/n' undefined
+(Font)              using `OMS/cmsy/m/n' instead
+(Font)              for symbol `textbraceleft' on input line 360.
+
+[1237]
+LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <9> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 465.
+ [1238] [1239] [1240] [1241]
+
+LaTeX Font Warning: Font shape `JT1/gt/m/it' undefined
+(Font)              using `JT1/gt/m/n' instead on input line 921.
+
+
+LaTeX Font Warning: Font shape `JY1/gt/m/it' undefined
+(Font)              using `JY1/gt/m/n' instead on input line 921.
+
+[1242] [1243] (./kitOS.aux)
+
+LaTeX Font Warning: Some font shapes were not available, defaults substituted.
+
+
+LaTeX Warning: There were multiply-defined labels.
+
+ ) 
+Here is how much of TeX's memory you used:
+ 1361 strings out of 95542
+ 16611 string characters out of 1190447
+ 72034 words of memory out of 1500000
+ 4525 multiletter control sequences out of 10000+50000
+ 17521 words of font info for 68 fonts, out of 1200000 for 2000
+ 14 hyphenation exceptions out of 8191
+ 32i,9n,23p,299b,631s stack positions out of 5000i,500n,6000p,200000b,5000s
+
+Output written on kitOS.dvi (10 pages, 60520 bytes).

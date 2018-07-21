@@ -1,0 +1,228 @@
+**********************************************
+*     BIND and MOUNT                         *
+*                                            *
+**********************************************
+
++--------------------------------------------+
+|       BIND                                 | 
++--------------------------------------------+
+
+<<< sysbind() -> bindmou t()  in sysfile-l4.c >>>
+
+* sysbind(args{name, old, flag}, ..)
+      :
+      bindmount(  )
+          :
+          c0 = namec(mname, Abind, 0, 0);  // pr_chan(c0);
+          :
+          c1 = namec(mold, Amount, 0, 0);    // c1: mount point
+          :
+          ret = cmount(&c0, c1, flag, 0);  <=== 
+          : 
+          cclose(c1);
+          :                                                                                 
+          cclose(c0);
+          :
+          return ret;
+
+
+<<< cmount() in chan.c >>>     
+
+    int cmount(Chan **newp, Chan *old, int flag, char *spec)  //% ONERR
+    {
+        Chan *new;
+        Mhead *m, **l, *mh;
+        Mount *nm, *f, *um, **h;
+        Pgrp *pg;
+        .....
+        order = flag&MORDER;
+        ....
+        new = *newp;
+        mh = new->umh;
+        ....
+        pg = up->pgrp;
+        wlock(&pg->ns);  //%
+        ....
+        l = &MOUNTH(pg, old->qid);
+        for(m = *l; m; m = m->hash){
+                if(eqchan(m->from, old, 1))
+                        break;
+                l = &m->hash;
+        }
+        if(m == nil){
+                m = newmhead(old);
+                *l = m;
+                if(order != MREPL)
+                        m->mount = newmount(m, old, 0, 0);
+                                                                                           
+                /*                   old  --------------->+- Chan -+
+                 *                       /             |  |        |
+                 *                      /              |  |        |
+                 *                     /               |  +--------+
+                 *                    /                |
+                 *  m--> +- Mhead -+ /                 |
+                 *       | from ---|-                  |
+                 *       |         |                   |
+                 *       | mount --|-----> +- Mount -+ |
+                 *       |         |       |  to   --|--
+                 *       +---------+       |         |
+                 *                         |  next   |
+                 *                         +---------+
+                 */
+        }
+                                                                                           
+        ....
+        nm = newmount(m, new, flag, spec);
+                                                                                           
+        /*
+         * m-->+- Mhead -+  nm-->+- Mount -+       +- Chan -+ <-- new
+         *     |         |       |  to ----|------>|        |
+         *     | mount --|------>|         |       | umh ---|---> Mhead <-- mh
+         *     |         |       |         |       |        |
+         *     +---------+       +---------+       +--------+
+         */
+                                                                                           
+        if(mh != nil && mh->mount != nil){
+                flg = order;
+                if(order == MREPL)
+                        flg = MAFTER;
+                h = &nm->next;
+                um = mh->mount;
+                for(um = um->next; um; um = um->next){
+                        f = newmount(m, um->to, flg, um->spec);
+                        *h = f;
+                        h = &f->next;
+                }
+        }
+        if(m->mount && order == MREPL){
+                mountfree(m->mount);
+                m->mount = 0;
+        }
+        if(flag & MCREATE)  nm->mflag |= MCREATE;
+        if(m->mount && order == MAFTER){
+                for(f = m->mount; f->next; f = f->next) /*empty*/ ;
+                f->next = nm;
+        }else{
+                for(f = nm; f->next; f = f->next) /*empty*/  ;
+                f->next = m->mount;
+                m->mount = nm;
+        }
+        return nm->mountid;
+    }
+
+
+
++--------------------------------------------+
+|       MOUNT                                | 
++--------------------------------------------+
+
+
+<<< sysmount() -> bindmou t()  in sysfile-l4.c >>>
+
+* sysmount(args{fd, afd, old, flag, aname}, ..)
+      :
+      bindmount(  )
+          :
+          ac = nil;
+          bc = fdtochan(fd, ORDWR, 0, 1);
+          :
+          if(afd >= 0) {
+              ac = fdtochan(afd, ORDWR, 0, 1);
+          }
+          bogus.chan = bc;
+          bogus.authchan = ac;
+          bogus.spec = spec;
+          :
+          spec = validnamedup(spec, 1);
+          :
+          ret = devno('M', 0);
+          c0 = devtab[ret]->attach((char*)&bogus);  <===
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          free(spec);
+          if(ac)
+              cclose(ac);
+          cclose(bc);
+          :
+          c1 = namec(mold, Amount, 0, 0);    // c1: mount point
+          :
+          ret = cmount(&c0, c1, flag, bogus.spec);  <===
+          :
+          cclose(c1);
+          :                                                                                 
+          cclose(c0);
+          fdclose(fd, 0);
+          return ret;
+      :
+
+
+
+
+<<< ATTACH function in devxxx.c >>>
+
+
+
+
+
+<<< mntattach(): ATTACH function in devmnt.c >>>
+
+/*                          bogus.chan
+ *   c --> +-- Chan  --+       +-- Chan --+   m -> +-- Mnt ---+
+ *         | type: 'M' |       |          |        |          |
+ *         | dev       |       |          |<-------|--c       |
+ *         | qid       |       | qid      |        |          |
+ *         | mchan ----|-----> |          |        |          |
+ *         | mqid      |       | mux -----|------> |          |
+ *         |           |       |          |        +----------+
+ *         +-----------+       +----------+
+ *                           pipe/connection to the server
+ */
+static Chan* mntattach(char *muxattach) //% ONERR
+{                                                                                          
+        Mnt *m;
+        Chan *c;
+        Mntrpc *r;
+        struct bogus{
+                Chan    *chan;  // Server-connection
+                Chan    *authchan;
+                char    *spec;
+                int     flags;
+        }bogus;
+                                                                                           
+        bogus = *((struct bogus *)muxattach);
+        c = bogus.chan;  // Server-connection
+                                                                                           
+        m = c->mux;
+        if(m == nil){
+                mntversion(c, nil, 0, 0);
+                m = c->mux;
+                if(m == nil) {
+                        ERROR_RETURN(Enoversion, nil); //%
+                }
+        }
+                                                                                           
+        /-------/ From now on, c is Mnt-cnannel -------
+        c = mntchan();
+        ......
+        r = mntralloc(0, m->msize);
+        ......
+        r->request.type = Tattach;
+        r->request.fid = c->fid;
+                                                                                           
+        if(bogus.authchan == nil) r->request.afid = NOFID;
+        else        r->request.afid = bogus.authchan->fid;
+                                                                                           
+        r->request.uname = up->user;
+        r->request.aname = bogus.spec;
+                                                                                           
+        rc = mountrpc(m, r);
+        c->qid = r->reply.qid;
+        c->mchan = m->c;
+        incref(&m->c->_ref);  //% m->c
+        c->mqid = c->qid;
+                                                                                           
+        mntfree(r);
+                                                                                           
+        if(bogus.flags&MCACHE)  c->flag |= CCACHE;
+        return c;
+}
+

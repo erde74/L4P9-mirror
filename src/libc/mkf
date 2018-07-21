@@ -1,0 +1,51 @@
+##############################################################
+#          Makefile to make all lib-subdirectories           #
+##############################################################
+
+
+
+# Archiving 386/ fails ! WHY ?
+# 
+
+####################################################################
+SHELL    = bash
+RM       = rm
+LN_S     = ln -s
+CC       = gcc32
+LD       = ld
+OBJCOPY  = objcopy
+STRIP    = strip
+AR       = ar
+RANLIB   = ranlib
+GZIP     = gzip
+
+LIBGCC   = $(dir $(shell $(CC) --print-lib))
+
+##############################################################
+SUBDIRS = 9sys/  9syscall-l4/  fmt/  port/  386/  
+
+
+OBJ += $(foreach dir, $(SUBDIRS), $(patsubst %.c,%.o,$(wildcard $(dir)/*.c)))
+OBJ += $(foreach dir, $(SUBDIRS), $(patsubst %.S,%.o,$(wildcard $(dir)/*.S)))
+
+
+# OBJ = $(patsubst %.c,%.o, $(foreach dir, $(SUBDIRS), $(wildcard $(dir)/*.c)))
+# OBJ += $(patsubst %.S,%.o, $(foreach dir, $(SUBDIRS), $(wildcard $(dir)/*.S)))
+
+# OBJ = $(patsubst %.c,%.o,$(wildcard 9sys/*.c)) 
+# OBJ += $(patsubst %.c,%.o,$(wildcard 9syscall-l4/*.c)) 
+# OBJ += $(patsubst %.S,%.o,$(wildcard 9syscall-l4/*.S)) 
+# OBJ += $(patsubst %.c,%.o,$(wildcard fmt/*.c)) 
+# OBJ += $(patsubst %.c,%.o,$(wildcard port/*.c)) 
+# OBJ += $(patsubst %.S,%.o,$(wildcard 386/*.S)) 
+
+LIB = libxxx.a
+
+all:   $(LIB)
+
+$(LIB): $(OBJ)
+	@$(AR) rvc $@ $(OBJ)
+	@$(RANLIB) $@
+ 
+
+

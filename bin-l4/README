@@ -1,0 +1,29 @@
+<><><> This directory contains: <><><>
+
+====== L4-ka micro kernel binary and its support binaries ====
+
+[1] README
+	This file
+
+[2] l4ka-0507.gz
+	"L4-ka Pistachio" kernel binary  (build in July, 2005) 
+
+    l4ka-0707.gz
+	"L4-ka Pistachio" kernel binary  (build in July, 2007) 
+
+[3] sigma0-0507.gz
+	Root pager binary for L4-ka. (build in July, 2005)
+
+    sigma0-0707.gz
+	Root pager binary for L4-ka. (build in July, 2007)
+
+[4] kickstart-0507.gz
+	Booter binary for L4-ka.  (build in July, 2005)
+	
+    kickstart-0707.gz
+	Booter binary for L4-ka.  (build in July, 2007)
+	
+==============================================================
+
+[5]  lp49-boot.fd-0707    
+      L4 (2007-07)

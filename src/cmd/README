@@ -1,0 +1,85 @@
+======= cmd/simple/ ============
+--- 09-*-*  KM -------------
+  cmd/simple/
+	ramfs.c -- Hoped to work.
+	import.c  -- Not yet completed
+	init.c   -- Not yet completed
+	ls.c     -- Hoped to work.	
+	cat.c 	-- Hoped to work  	
+	echo.c 	-- Hoped to work  	
+
+	cpu.c  	-- Not yet completed
+	sh.c  	-- Not yet completed
+	tar.c 	-- ?
+	srv.c	-- Hoped to work  	
+
+	cp.c	-- A function qsh_cp() is added.
+		   qsh_cp() is called from QSH as a buildin command. 
+		   cf. -DQSH flag. in 9/qsh/Makefile.
+
+	mkdir.c	-- A function qsh_mkdir() is added
+		   qsh_mkdir() is called from QSH as a buildin command. 
+		   cf. -DQSH flag. in 9/qsh/Makefile.
+
+
+------ 09-09-15  YU -----------------
+
+  cmd/simple/
+  Followings are ported by Mr. Ueda.	
+	calendar .c	
+	cal.c 
+	wc.c 
+	sum.c 
+	tail.c 
+	date.c 
+	chmod.c 
+	chgrp.c 
+	mv.c 
+	cmp.c 
+	awd.c 
+
+
+
+===== cmd/aux/ ============
+
+
+
+===== cmd/bin =============
+
+
+===== cmd/con/ ==============
+
+
+====== cmd/dos2/ =============
+
+
+===== cmd/dossrv/ ============
+
+
+===== cmd/exportfs/ ============
+
+
+====== cmdext2srv/ ============
+
+
+====== cmd/gzip/ ==========
+
+
+====== cmd/ip/ =============
+
+====== cmd/misc/ ============
+
+
+====== cmd/ndb/ ============
+
+
+======= cmd/rc/ ============
+
+
+===== cmd/unix/ ============
+
+
+====== cmd/usb/ ===========
+   
+
+

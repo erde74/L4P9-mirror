@@ -1,0 +1,56 @@
+#include <l4all.h>
+
+#define DISPLAY ((char*)0xb8000 )
+// #define __COLOR     14
+#define NUM_LINES 24
+
+char __COLOR = 14;
+unsigned __cursor = 0;
+
+
+void l4putc(char c)
+{
+    int i;
+
+    switch(c) {
+    case '\r':
+         __cursor = (__cursor /160) * 160;  //KM--- test -----
+        break;
+    case '\n':
+        __cursor += (160 - (__cursor % 160));
+        break;
+    case '\t':
+	for ( i = 0; i < (8 - (__cursor % 8)); i++ )
+	{
+	    DISPLAY[__cursor++] = ' ';
+	    DISPLAY[__cursor++] = __COLOR;
+	}
+        break;
+    default:
+        DISPLAY[__cursor++] = c;
+        DISPLAY[__cursor++] = __COLOR;
+    }
+    if ((__cursor / 160) == NUM_LINES) {
+	for (i = 40; i < 40*NUM_LINES; i++)
+	    ((L4_Word_t*)DISPLAY)[i - 40] = ((L4_Word_t*)DISPLAY)[i];
+	for (i = 0; i < 40; i++)
+	    ((L4_Word_t*)DISPLAY)[40*(NUM_LINES-1) + i] = 0;
+	__cursor -= 160;
+    }
+}
+
+void l4_set_print_color(char c)
+{
+  __COLOR = c;
+}
+
+void l4_set_print_color_default()
+{
+  __COLOR = 14;
+}
+
+
+void l4_reset_print_cursor( )
+{
+  __cursor = 0;
+}

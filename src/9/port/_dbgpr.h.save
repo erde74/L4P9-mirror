@@ -1,0 +1,11 @@
+/*   ===== _dgbpr.h =====
+ * A user of this file must define _DBGFLG in advance:
+ *  #define   _DBGFLG 1      //OR*  static int _DBGFLG = 1; 
+ *  #include  "_dbgpr.h"
+ */  
+
+extern int  l4printf_b(const char *fmt, ...);
+extern char l4printgetc(const char *fmt, ...);
+
+#define  DBGPRN  if(_DBGFLG) l4printf_b
+#define  DBGBRK  if(_DBGFLG) l4printgetc

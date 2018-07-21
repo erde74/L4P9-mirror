@@ -1,0 +1,21 @@
+############################
+title = LP49: CD BOOT (Hvm + Pc + Init -> Qsh/Rc)
+kernel=/l4/kickstart-0804.gz
+module=/l4/l4ka-0804.gz
+module=/l4/sigma0-0804.gz
+module=/boot/hvm.gz
+module=/boot/pc.gz
+module=/boot/init.gz
+module=/boot/dossrv.gz
+module=/bin/9660srv
+
+
+
+
+############################
+title = L4Ka-0804  pingpong 
+kernel=/l4/kickstart-0804.gz
+module=/l4/l4ka-0804.gz
+module=/l4/sigma0-0804.gz
+module=/l4/pingpong.gz
+

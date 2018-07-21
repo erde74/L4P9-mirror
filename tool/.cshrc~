@@ -1,0 +1,14 @@
+# .cshrc
+
+# User specific aliases and functions
+
+alias rm 'rm -i'
+alias cp 'cp -i'
+alias mv 'mv -i'
+
+alias mntfd  'losetup /dev/loop0 /home/maruyama/l4pmx/l4pmx-boot.fd; mount /dev/loop0 /mnt/floppy; ls /mnt/floppy'
+alias umntfd 'umount /mnt/floppy; losetup -d /dev/loop0; echo UMNTFD'
+
+setenv PATH "/usr/local/sbin:/usr/sbin:/sbin:${PATH}:${HOME}/bin"
+
+set prompt=\[`id -nu`@`hostname -s`\]\#\ 

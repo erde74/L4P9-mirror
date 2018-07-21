@@ -1,0 +1,57 @@
+<><><><> How to make <><><>
+
+# cd src
+
+# make clean
+
+# make 
+
+# make install
+   --- binaries are installed onto rootfs
+
+# cd this-directory 
+
+# ./mkcd
+  --- CD image file "../lp49-boot.cd" is made.
+
+
+
+
+
+This directory contains:
+
+======== bin-l4/*/ ============
+	These are included in the boot floppy.
+
+	l4ka-xxx.gz	:	L4kernel
+	kickstart-xxx.gz:  	kickstart L4
+	sigma0-xxx.gz	:	Sigma0 pager
+	libl4-xxx.a	:	L4 library
+	libio-0804.a	:	L4 I/O library
+
+
+========= doc/ ===============
+	Documents 
+
+
+========= include/ ==========
+	Header files 
+
+======== lib/ ==============
+	Symbolic links to libraries.
+
+======= lp49-boot.fd ========
+	LP49 boot floppy  (1.44 MB version)
+
+======= lp49-bootx2.fd ========
+	LP49 boot floppy  (2.88 MB version)
+
+	To use on VMware, set BIOS to accepet 2.88M FD.
+
+======= src/ ===========
+	LP49 source directory
+
+======= tool/ ===========
+
+
+

@@ -1,0 +1,581 @@
+
+This RIO is redesigned to use LP49-original libactobj instead of Plan9 libthread.
+
+<><><><> Active objects <><><><>
+  Following active objects play main roles.
+
+      MOUSECTL                mousethread
+   []---------------+       []-----------+
+    | Mousectl      |        |           |
+    |---------------|        |           |
+    | _ioproc()     |        |           |
+    +---------------+        +-----------+
+
+      KEYBOARDCTL
+   []---------------+
+    | Keyboardctl   |
+    |---------------|
+    | _ioproc()     |
+    +---------------+
+
+      winclosethread
+   []---------------+
+    |      --       |
+    |---------------|
+    |winclosethread |
+    +---------------+
+
+      deletehtread
+   []---------------+
+    |      --       |
+    |---------------|
+    | deletethread  |
+    +---------------+
+
+      timerthread
+   []---------------+
+    |      --       |
+    |---------------|
+    | deletethread  |
+    +---------------+
+
+                                                     WINDOW actobj 
+       FILSYS actobj    =======================>  []-----------+
+   []---------------+          XFID ActObj         | Window    |
+    | Filsys        |  ====> []------------+ ===>  |-----------|
+    |---------------|         | Xfid       |       | winctl()  |
+    | filsysproc()  |         |----------- |       +-----------+
+    |               |         | xfidctl()  |       
+    |               |         +------------+       
+    +---------------+   =======================>     WINDOW actobj
+        /\                      XFID ActObj        []-----------+
+        ||             =====> []------------+ ===>  | Window    |
+        || 9P                  | Xfid       |       |-----------|
+        || msg                 |----------- |       | winctl()  |
+        ||                     | xfidctl()  |       +-----------+
+        ||                     +------------+       
+        ||
+        ||
+        ||
+     Client-process           Command-process
+   []---------------+       []-------------+
+    |      --       |------> |             |
+    |---------------| fork   |             |
+    |  rio()        |        |             |
+    +---------------+        +-------------+
+
+     Client-process           Command-process
+   []---------------+       []-------------+
+    |       --      |------> |             |
+    |---------------| fork   |             |
+    |  rio()        |        |             |
+    +---------------+        +-------------+
+
+
+/*************************************************
+ *     FILSYS ActObject      (fsys.c)            *
+ *       Data: Filsys                            *
+ *       Action:  filsysproc()                   *
+ *************************************************/
+
+   [_]------------------------+              XFID ActObj          WINDOW actobj
+     |+-- Filsys ------------+|   =======> []------------+ ===> []-----------+
+     || int     cfd;         ||             |            |       |           |
+     || int     sfd;         ||             |            |       |           |
+     || int     pid;         ||             +------------+       +-----------+
+     || char    *user;       ||	       		  
+     || Channel *cxfidalloc; ||	 =======> []------------+ ===> []-----------+  
+     || Fid     *fids[Nhash];||	   	   |            |       |           |  
+     |+----------------------+|	       	   |            |       |           |
+     |                        |	           +------------+       +-----------+
+     |                        |	       		  
+     |                        |	       		  
+     +------------------------+	       		  
+
+[Role]
+  This works as the service root.
+
+[Created]
+   Created at rio-server start up time.
+
+[Input messages]
+   9P messages from client processes.
+
+[Output messages]
+ (１) To Xfid active-object
+
+ (２) To Window active-object
+
+（３）To winclosethread
+
+
+
+/*************************************************
+ *     Window ActObject      (wind.c)            *
+ *       Data: Window                            *
+ *       Action:  winctl()                       *
+ *************************************************/
+
+  [_]-----------------------+
+    |+--Window-------------+|
+    || Frame     _f        ||
+    || Image     *i        ||
+    || Mousectl   mc       ||
+    || Mouseinfo  mouse    ||
+    ||   :                 ||
+    ||   :                 ||
+    || Rectangle  screenr  ||
+    ||   :                 ||
+    ||   :                 ||
+    |+---------------------+|
+    |                       |
+    |                       |
+    |                       |
+    +-----------------------+
+
+[Role]
+  Each window is represented by a WINDOW actobject.
+
+[ How/When created]
+    * created per window.
+
+    Window  **window;
+    Window  *wkeyboard;     /* window of simulated keyboard */
+    int     nwindow;
+    Window  *input;
+    Window  *hidden[100];
+
+
+[Input Messages]
+
+(1) WKey message :  
+      keyboardthread ==== WKey{Rune[*], size} ===> WINDOW actobj
+
+(2) WMouse message :  
+      mousethread ==== WMouse{Mouse, size} ===> WINDOW actobj
+
+(3) WMouseread message :
+     XFID actobj ==== WMouseread{...} ===> WINDOW actobj
+                           | When gate OK 
+     XFID  <=== Mouse{int buttons; Point xy; uint msec} ===  WINDOW
+
+(4) WCtl message : 
+     XFID actobj ==== Wctlmesg{int type; Rectangle r; Image *image} ===> WINDOW actobj
+
+(5) WCwrite message : 
+     XFID actobj ==== WCwrite{...} =======> WINDOW actobj
+
+(6) WCread message : 
+     XFID actobj ==== WCread{...} =======> WINDOW actobj
+                         | When gate open
+     XFID  <=== String{void *s; int ns} ===========  WINDOW
+
+(7) WWread message : 
+     XFID actobj ==== WCread{...} ===> WINDOW actobj
+                         | When gate open
+     XFID  <=== String{void *s; int ns} ===========  WINDOW
+
+
+
+[Reference]
+
+ (3) WMouseread message : 
+
+
+ (5) WCwrite message :  
+    XFID ===> Stringpair{void *s; int ns} ====> WINDOW
+
+   WCwrite:                     Cf. xfid.c:354
+   GUARD: :(!w->scrolling && !w->mouseopen && w->qh>w->org+w->_frame.nchars)
+   WINDOW:winctl:(w->conswrite)!(cwm) --> XFID:xfidwrite:(w->conswrite)?(cwm)
+   WINDOW:winctl:(cwm.cw)?(pair) <-- XFID:xfidwrite:(cwm.cw)!(pair)
+
+
+
+[Other Output messages]
+
+ (*) "pidc"
+    1488:   sendul(pidc, 0);
+    1494:   sendul(pidc, 0);
+    1500:   sendul(pidc, 0);
+
+--------------------------------------------------------
+void winctl_thread(...)
+{
+    L_mbuf *mbuf; 
+    .....
+    for(;;){
+       ....
+       msgtag = l_recv0(...., mbuf);
+       witch(MLABEL(msgtag)){
+       case WKey: {
+            Rune  rune[...];
+	    l_getmsg(mbuf, "i1s1", &n, rune, &len);
+            ....
+            break;
+          }
+      case MMouse: {
+            Mouse  mouse;
+	    l_getmsg(mbuf, "i1s1", &n, &mouse, &len);
+            ....
+            break;
+          }
+      case WMouseread: .....
+            ...
+      case WCtl: {
+           Wctlmsg  wcm;
+           l_getmsg(mbuf, "s1", &wcm, &len);
+           wctlmesg(w, wcm.type, wcm.r, wcm.image);
+            ....
+         }
+      case WCwrite:
+            ....
+      case WCread:
+            ....
+      case WWread: 
+            ....
+      }
+      .......
+}
+
+
+/*************************************************
+ *     XFID ActObject      (xfid.c)              *
+ *       Data: Xfid                              *
+ *       Action:  xfidctl()                      *
+ *************************************************/
+
+       xfidctl  <xfid.c:102>
+   [_]---------------------+
+     |+- Xfid ------------+|
+     || Fcall             ||
+     ||                   ||
+     || Channnel *c       ||
+     || Fid      *f       ||  Xfid->f->w is the target window.
+     || uchar    *buf     ||
+     || Filsys   *fs      ||
+     ||                   ||
+     |+-------------------+|
+     |                     |
+     | for(;;){            |
+     |   f = recvp(x->c);  |
+     |   (*f)(x);          |
+     | }                   |
+     |                     |
+     +---------------------+
+
+[Role]
+  To support concurrent request messages.
+  
+[Input messages]
+
+(1) XC message
+
+  119:     f = recvp(x->c);  //%
+
+(2) XFLUSHC message
+  423:    recv(x->flushc, nil);   /* wake up flushing xfid */
+  702:    recv(x->flushc, nil);   /* wake up flushing xfid */
+  850:    recv(x->flushc, nil);   /* wake up flushing xfid */
+  649:    recv(x->flushc, nil);   /* wake up flushing xfid */
+
+
+(3) Negotiation 
+(3-*) WCONSWRITE 
+   WCwrite:                     Cf. xfid.c:354
+   GUARD: !(!w->scrolling && !w->mouseopen && w->qh>w->org+w->_frame.nchars)
+
+   WINDOW:winctl:(w->conswrite)!(cwm) --> XFID:xfidwrite:(w->conswrite)?(cwm)
+   WINDOW:winctl:(cwm.cw)?(pair) <-- XFID:xfidwrite:(cwm.cw)!(pair)
+
+      404:    alts[CWdata].c = w->conswrite;  .v= &cwm;  .op = CHANRCV;
+      433:    send(swm.cw, &pair);
+
+(3-*) WCONSREAD 
+   WCread:                Cf. xfid.c:616
+   GUARD: (npart || (w->rawing && w->nraw>0)) ....
+
+   WINDOW:winctl:(w->consread)!(crm) --> XFID:xfidread:(w->consread)?(crm)
+   WINDOW:winctl:(crm.c1)?(pair) <-- XFID:xfidread:(crm.c1)!(pair)
+   WINDOW:winctl:(crm.c2)!(pair) --> XFID:xfidread:(crm.c2)?(pair)
+
+      624:   alts[CRdata].c = w->consread; .v = &crm; .op = CHANRCV;
+      647:   send(c1, &pair);
+      656:   recv(c2, &pair); //%
+
+(3-*) WMOUSEREAD 
+   WMouseread:                   Cf. xfid.c::586
+   GUARD: (w->mouseopen && w->mouse.counter != w->mouse.lastcounter)
+
+   WINDOW:winctl:(w->mouseread)!(mrm) --> XFID:xfidread:(w->mouseread)?(mrm)
+   WINDOW:winctl:mrm.cm!(m._mouse) --> XFID:xfidread: (mrm.cm)?(ms)
+
+      683:  alts[MRdata].c = w->mouseread; .v = &mrm; .op = CHANRCV;
+      708:  recv(mrm.cm, &ms);
+      703:  recv(mrm.cm, nil);  /* wake up window and toss data */
+      708:  recv(mrm.cm, &ms); //%
+
+
+(3-*) WCTLREAD
+   WWread:                 Cf. xfid.c:813
+   GUARD: !(w->deleted || !w->wctlready)
+
+   WINDOW:winctl:(w->wctlread)!(cwrm) --> XFID:xfidread:(w->wctlread)?(cwrm)
+   WINDOW:winctl:(cwrm.c1)?(pair) <-- XFID:xfidread:(cwrm.c1)!(pair)
+   WINDOW:winctl:(cwrm.c2)!(pair) --> XFID:xfidread:(cwrm.c2)?(pair)
+
+      825:  alts[WCRdata].c = w->wctlread;  .v = &cwrm; .op = CHANRCV;
+      843:        c1 = cwrm.c1;
+      844:        c2 = cwrm.c2;
+      857:        recv(c2, &pair);  
+
+Flush
+      407:   alts[CWflush].c = x->flushc;  .v = nil; .op = CHANRCV;
+      627:   alts[CRflush].c = x->flushc;  .v = nil;  .op = CHANRCV;
+      686:   alts[MRflush].c = x->flushc;   .v = nil;  .op = CHANRCV;
+      828:   alts[WCRflush].c = x->flushc;   .v = nil;   .op = CHANRCV;
+
+
+<><><> WCTL ActObject <><><>
+
+(*) As l_threads are kernel threads,
+    Plan9's wctlproc and wctlthread are merged into one "wctl" thread.
+
+  [_]--------------------------------+
+    |    ;                           |
+    | for(;;){                       |
+    |   n = read(wctlfd, buf, ...);  | wctlfd is a server link.
+    |   :			     |
+    |   cmd = parsewctl(...);	     |
+    |   :			     |
+    |   if (cmd == New) 	     |
+    |      wctlnew(....);	     |  -->wctlnew(..) in wctl.c
+    |   :			     |      --> new(..) in rio.c
+    | } 			     |
+    |				     |
+    +--------------------------------+
+
+
+/*************************************************
+ *     MOUSECTL ActObject     (libdraw/mouse.c)  *
+ *       Data: Mousectl                          *
+ *       Action:  _ioproc()                      *
+ *************************************************/
+       libdraw/mouse.c  
+
+   [_]---------------------+
+     |+- MOUSECTL---------+|
+     || Mouse             ||
+     ||                   ||
+     || Channel *c        ||   L_tidx mbox;
+     || Channel *resizec  || 
+     ||                   ||
+     || Image *image      ||
+     |+-------------------+|
+     |                     |
+     | for(;;){            |
+     |   n=read(mc->mfd, ) |
+     |     :               |
+     |   send(mc->c  )     |
+     | }                   |
+     +---------------------+
+
+
+<><><> MOUSETHREAD ActObject <><><>
+       cf. rio.c: mousethread
+   [_]---------------------+
+     |+-------------------+|
+     ||                   ||
+     ||                   ||
+     |+-------------------+|
+     |                     |
+     | for(;;){            |
+     |   l_recv(..., )     |
+     |   IF(MRESHAPE)....  |
+     |   ELSIF(MMOUSE).... |
+     |    ...              | 
+     | }                   |
+     +---------------------+
+
+
+
+/*************************************************
+ *     KEYBOARDCTL ActObject  (keyboard2.c)      *
+ *       Data: Keyboaedctl                       *
+ *       Action:  _ioproc()                      *
+ *************************************************/
+
+       libdraw/keyboar.c   --- must be completely changed.
+   [_]---------------------+
+     |+- KEYBOARDCTL------+|
+     || Channel *c        ||  L_tidx  mbox;
+     ||                   ||
+     ||                   ||
+     ||                   ||
+     || int      pid      ||
+     |+-------------------+|
+     |                     |
+     | for(;;){            |
+     |   n=read(kc->consfd)|
+     |     :               |
+     |   send(kc->c  )     |
+     | }                   |
+     +---------------------+
+
+
+
+--- libdraw::Keybordctl ------------------------
+
+    consfd = open("/dev/cons" ...);
+    for(;;){
+         ......
+         READ(consfd ...);
+         ....
+         ASEND(KBD_THREAD, WKey, ...);
+         .....
+    }   
+
+------ rio.c::keyboardthread ---------------
+
+    for(;;){
+        .....
+        ARECV(.....);   // WKey message
+        .....
+	ASEND(INPUTWINDOW, WKey, ....);
+        .....
+    }
+
+
+------ wind.c::winctl-thread ---------------
+
+    for(;;){ 
+       ARECV(.....)
+       switch(MESSAGETYPE){
+       case WKey: ....
+                   wkeyctl(....);
+                  .....
+
+       }
+       ....
+    }
+
+
+
+
+<><><> Server link <><><>
+
+ /srv/rio.USR.PID       [] FIlsysproc
+   <==================>  |----------+
+      ServerLink         |          |
+                         |          |
+                         +----------+
+
+ /srv/riowctl.USR.PID   [] wctlproc           [] wctlthread
+   <==================>  |----------+          |---------+
+      ServerLink         |          |          |         |
+                         |          |          |         |
+                         +----------+          +---------+
+
+
+
+<><><><><><> Active objects <><><><><><><><><<><><><><>
+
+=========================================================
+[1]  Filsys::filsysproc thread   (fsys.c)
+      -->   Xfid::xfidctl thread    (xfid.c)
+
+(Sender)
+    filsysproc(void *arg)   //*   <===> Filsys
+    {
+        Xfid *x;
+         :
+        x = nil;
+        for(;;){
+                buf = emalloc(messagesize+UTFmax);
+                n = read9pmsg(fs->sfd, buf, messagesize);
+                if(x == nil){
+                        ASSIGN x (i.e. xfidctl thread)
+                }
+
+                convM2S(buf, n, &x->_fcall);
+                if(fcall[x->_fcall.type] == nil) //%
+                        x = filsysrespond(fs, x, &t, Ebadfcall);
+                else{
+                       if( x->_fcall.type==Tversion ||
+                           x->_fcall.type==Tauth) //%
+                                f = nil;
+                        else
+                          f = newfid(fs, x->_fcall.fid);  //%
+                        x->f = f;
+                        x  = (*fcall[ x->_fcall.type])(fs, x, f);  //%
+                }
+                firstmessage = 0;
+        }
+    }
+
+
+       sendp(x->c, xfidflush);
+        ==>   l_send(TID2TIDX(x->tid), -1, "i1", xfidflush);
+
+(Receiver)
+
+    l_thread_create("xfidctl#", xfidctl, 2000, sizeof(Xfid);
+    xfidctl( )  //%  arg -> Window
+    {
+        Xfid *x;
+        void (*f)(Xfid*);
+        x = MY_OBJ(Xfid*);
+        for(;;){
+                l_recv(&from, -1);
+		l_getmsg(0, "i1", &f);
+                (*f)(x);
+                if(decref(&x->_ref) == 0) //% x
+                        sendp(cxfidfree, x); //%
+        }
+    }
+
+
+*============================================================*
+|       Mouse                                                |
+*============================================================*
+
+--- libdraw::Mousectl ------------------------
+
+    mfd = open("/dev/mouse", ....);
+    for(;;){
+         ......
+         READ(mfd,  ...);
+         ....
+         ASEND(MOUSE_THREAD, messagetype, ...);  // MReshape, MMouse 
+         .....
+    }   
+
+------ rio.c::mousethread ---------------
+
+    for(;;){
+        .....
+        ARECV(.....);   // MReshape, MMouse message
+	switch(MESSAGETYPE){
+        case MReshape:
+               resized();
+        case MMouse :  
+	     .....
+             ASEND(WINPUTWINDOW, msgtype ....);
+        .....
+    }
+
+
+------ rio.c::winctl-thread ---------------
+
+    for(;;){ 
+       ARECV(.....)
+       switch(MESSAGETYPE){
+       case WMouse: ....
+                   
+                  .....
+
+       }
+       ....
+    }
+
+===================================================================

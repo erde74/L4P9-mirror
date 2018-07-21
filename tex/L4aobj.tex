@@ -1,0 +1,1137 @@
+\documentstyle{jarticle}
+% \documentstyle[twocolumn]{jarticle}
+\input epsf
+\input comment.sty
+
+\topmargin = 0cm
+\oddsidemargin = 0cm
+\evensidemargin = 0cm
+\textheight = 24cm
+\textwidth = 17cm
+
+\setcounter{secnumdepth}{2}
+
+%-----------------------------
+\begin{document}
+
+\title{\Large\bf  LP49 能動オブジェクトライブラリ libl4thread \\
+        （書きかけ）}
+
+\author{$H_2O$}
+
+% \eauthor{
+%  Katsumi Maruyama
+% }
+
+% \affiliation{国立情報学研究所   National Institute of Informatics}
+
+\maketitle
+
+\section{目的}
+
+本ライブラリ libl4thread は、L4マイクロカーネル上で
+以下の機能を提供するものである。
+
+\begin{description}
+\item [能動オブジェクト（並行オブジェクト）支援：]
+  能動オブジェクト（自前のスレッドを持ち、他と並列実行できるオブジェクト)
+  を容易に実現できる。
+\item [分散処理；]
+  リモートノードとのメッセージ交信を容易に行えるようにする。
+\item [非同期メッセージ：]
+  L4は同期メッセージのみを提供しているが、
+  分散処理のためには非同期メッセージも望まれる。
+\item [Future reply：]
+  相手スレッドに非同期メッセージで要求を送り、
+  非同期で返される返答メッセージを受信する仕組み。
+\item[メッセージのalternative受信：]
+
+\item[CSPモデルサポート：]
+  HoareのCSPモデルは、もっとも重要な並列処理モデルである。
+  Plan9 のlibthread ライブラリもCSPモデルのサポートを意図しているが、
+  必ずしも簡明とは言えない。
+  本ライブラリ libl4thread は、CSP的処理も簡明に記述できることを狙っている。
+\item [マルチスレッド処理記述の容易化：]
+  L4は融通性と効率に優れるが、使いこなすには相応のスキルを要する。
+  本ライブラリにより、L4の機能をより簡便に使うことができる。
+\end{description}
+
+L4は、プロセス間ページマップなどの高度な機能も有しているが、
+使いこなすには相応のスキルを有する。
+本ライブラリでは、このような高度機能を容易に使えるように
+追々機能追加をしていく予定である。
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{能動オブジェクト}
+
+オブジェクト指向では、オブジェクトに何かをやってもらうにはメッセージを送る。
+つまり、{\bf メッセージパッシング}することにより、そのオブジェクトのメソッドが
+実行される。
+メッセージパッシングとはいうものの、JavaやC++で普通に作ったオブジェクトの
+メッセージパッシングは関数呼び出しに過ぎず、
+せいぜい実行すべきメソッドが動的に決定されるだけである。
+つまり、オブジェクトのメソッドは呼び出した側のスレッドによって実行される。
+(特に区別する場合は、このようなオブジェクトを、{\bf 受動オブジェクト}と呼ぶ。）
+
+(メッセージパッシングという言葉に釣られて、JavaやC++のオブジェクトが
+並列動作すると誤解している人もいるようですが、
+それは違います。)
+
+{\bf 能動オブジェクト}とは、自前のスレッドを有したオブジェクトであり、
+メッセージを受けると自前のスレッドで目的メソッドを実行する。
+メッセージパッシングは、関数呼び出しではなく、
+文字通りスレッドへのメッセージ転送であり、
+各能動オブジェクトは並行動作できる。
+
+能動オブジェクトのメッセージ転送の形態には、一般に次の3種類がある。
+Mをメッセージ、C を送り手オブジェクト、S を受け手オブジェクトとする。
+\begin{description}
+\item[過去(past)型：]
+  C は S にMを送ったら、MがSによって実行されるのを待たずに、
+  Cは自分の処理を続行する。
+
+\item[現在型(now)：]
+  C は S にMを送ったら、S から何らかの返答が戻ってくるまで待つ。
+
+\item[未来型(future)：]
+  C は S にMを送ったら、返答が戻るのを待たずに、自分の処理を続行する。
+  S はメッセージMを処理して、応答を未来変数に入れる。
+  C が S からの応答を使う場合には、未来変数をアクセスする。
+  未来変数に応答が届いていなければ、届くまで自動的にまつ。
+\end{description}
+
+
+能動オブジェクトの仕組みを下図に示す。
+
+{\small\begin{verbatim}
+ 【能動オブジェクトの仕組み】
+        []----------------------------------------+
+         | _ _______           []--------------+  |
+ ---->   |  O O O O   ----->    |              |  |
+ Message | ---------            | Own thread   |  |
+         | Message Queue        |              |  |
+         |                      |              |  |
+         |                      +--------------+  |
+         |  +----------------------------------+  |
+         |  |    Instance Variables            |  |
+         |  |                                  |  |
+         |  |                                  |  |
+         |  +----------------------------------+  |
+         |  +----------------------------------+  |
+         |  |    Methods (functions)           |  |
+         |  |                                  |  |
+         |  |                                  |  |
+         |  +----------------------------------+  |
+         |                 :                      |
+         +----------------------------------------+
+\end{verbatim}}
+
+能動オブジェクトの送られたメッセージは、メッセージ行列に挿入される。
+オブジェクトの自前スレッドは、メッセージ行列からメッセージを取り出しては、
+指定された処理を実行する。
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{本ライブラリの中核プレイヤー： L\_thcbタイプ}
+
+{\flushleft\bf (1) スレッド制御ブロック  L\_thcb}
+
+本ライブラリの中核プレイヤーは、{\bf スレッド}（能動オブジェクトを含む）と
+{\bf メッセージボックス}である。
+各スレッドは、非同期メッセージを受理するためのメッセージボックスと、
+非同期返答を受理するための利付等ーボックスを持っている。
+また、スレッドから独立したメッセージボックも可能であり、スレッド間の共通ボックスとして使える。
+
+更に、自プロセス外(リモートノードあるいは自ノードの別プロセス)
+のスレッドやメッセージボックスの場合は、
+それらにアクセスするために{\bf 代行者(Proxy)} を用いる。
+
+これらの中核プレイヤーを表現するのが、\verb|L_thcb|テーブルである。
+各々は「\verb|L_thcb*|ポインタ」によって識別される。
+
+\begin{verbatim}
+---【定義】---------------------------------------------------------
+
+typedef struct  L_thcb   L_thcb;
+struct   L_thcb{
+    L_thcb *        next;            //
+    L4_ThreadId_t   tid;             // L4スレッドのID
+    unsigned int    isthread: 1;     // スレッドの場合１
+    unsigned int    ismbox: 1;       // メッセージボックスの場合１
+    unsigned int    isrbox: 1;
+    unsigned int    islocal: 1;      // ローカルの場合１
+    unsigned int    islocalnode: 1;  // 同一ノード別プロセス内 --> Proxy
+    unsigned int    isremotenode: 1; // リモートノード内 --> Proxy
+    unsigned int    isactobj:1;      //能動オブジェクトの時１
+    unsigned int          :1;
+    unsigned int    state:8;
+    unsigned int         :16;
+    char  * name;
+    int     lock;
+    L_mbox  mbox;         // 非同期メッセージを入れるメッセージボックス
+    L_replybox replybox;  //非同期返答メッセージを受けるリプライボックス
+    union{
+      struct{
+        unsigned int    stkbase;
+        unsigned int    stktop;
+      } thd;
+      struct{
+         ....
+      }proxy;
+};
+---------------------------------------------------------
+\end{verbatim}
+
+\verb|L_thcb|テーブルは、以下を表す。
+
+\begin{description}
+\item[(isthread==1)の場合]
+  スレッドである。スレッドは、
+  非同期メッセージが挿入されるメッセージボックス \verb|L_thcb.mbox| と
+  非同期返答が挿入されるリプライボックス \verb|L_thcb.replybox| を持っている。
+
+  スレッドの実行母体はL4マイクロカーネルのL4スレッドであり、
+  フィールド\verb|L_thcb.tid| で結ばれている。
+  これはアドレスではなく、L4スレッドID\verb|L4_ThreadId_t| である。
+  L4スレッドからは \verb|L4_UserDefinedHandle()|を呼ぶことで、
+  \verb|L_thcb|テーブルが求まる。
+
+\item[(isthread==0 且つ ismbox==1)の場合]
+  スレッド外の独立したメッセージボックスである。
+  スレッドは自前のメッセージボックスからも、
+  独立したメッセージボックスからもメッセージを受信できる。
+
+\item[(islocal==0)の場合]
+   別プロセスのスレッドあるいはメッセージボックスの Proxy である。
+   メッセージはL4のIPCで運ばれる。
+
+\item[(isremotenode==1) の場合]
+   別ノードのスレッドあるいはメッセージボックスの Proxy である。
+   メッセージはL4のIPCでNWサービスに運ばれ、そこから目的ノード
+   に転送される。（To be implemented)
+
+\end{description}
+
+スレッド実行の本体は、L4マイクロカーネルが提供するスレッドである。
+下図に示すように、\verb|L_thcb|テーブルから L4スレッドへは、
+アドレスではなく\verb|L4_thcb.tid|、
+つまり "\verb|L4_ThreadId_t|" で結ばれている。
+L4スレッドから\verb|L_thcb|テーブルへは、
+\verb|UserDefinedHandler( )| で結ばれている。
+
+スレッド外の独立したメッセージボックスは、L4スレッドを持たない。
+
+{\small\begin{verbatim}
+---【L_thcbとL4スレッドの関係図】----------------------------------------
+
+        L_thcbテーブル                    L4スレッド(utcb)
+       +-------------+  L4_ThreadId_t    []-------------+
+       |     tid  ---|------------------> |             |
+       |             |                    |             |
+       |             |                    |             |
+       |             |                    |             |
+       |             |<-------------------|--UserDefinedHandler
+       |             |                    |             |
+       +-------------+                    +-------------+
+-------------------------------------------------------------------------
+\end{verbatim}}
+
+
+
+　
+
+
+{\flushleft\bf (2) Thread ID}
+
+L4マイクロカーネルでは、スレッドは \verb|L4_ThreadId_t|タイプで識別する。
+\verb|L4_ThreadId_t| は、
+最上位8ビット procx をプロセスID、
+次の10ビット tidx をプロセス内のスレッド番号、
+その次の8ビット nodex をノード番号（自分は0)、
+最後の6ビット ver をversion番号として使用。
+
+(tidx == 0)のスレッドは、プロセスのmainスレッド、
+(tidx == 1)のスレッドは、非同期メッセージ処理を行うスレッドである。
+
+{\small\begin{verbatim}
+
+ L4_ThreadId_t
+     +-- 8---+---10--+-- 8--+--6--+
+     | procx |  tidx | nodex| ver |    ver>=2
+     +-------+-------+------+-----+
+\end{verbatim}}
+
+
+
+
+{\flushleft\bf (3) メッセージボックス L\_mbox}
+
+\begin{verbatim}
+---【定義】----------------------------------------------------
+typedef struct  L_mbox     L_mbox;
+struct L_mbox{
+    L_mbuf   *mqhead, *mqtail;
+    L_thcb   *tqhead, *tqtail;
+    int  lock;
+};
+-------------------------------------------------------------
+\end{verbatim}
+
+メッセージボックスは非同期メッセージを貯めておく容器である。
+メッセージを運ぶメッセージバッファ\verb|L_mbuf| は,
+ \verb|mqhead, mqtail| が作る待ち行列に挿入される。
+
+メッセージ行列が空きのときに読み出しを試みると、
+そのスレッドは、\verb|tqhead, tqtail|が構成する待ち行列に挿入される。
+
+
+{\flushleft\bf (4) リプライボックス L\_replybox}
+
+\begin{verbatim}
+---【定義】---------------------------------------------------------
+typedef struct  L_replybox L_replybox;
+struct L_replybox{
+    L_mbuf   *mqhead, *mqtail;
+    L4_ThreadId_t  receiver;
+    int  lock;
+};
+-----------------------------------------------------------------
+\end{verbatim}
+
+  TBD
+
+\hspace{3cm}
+
+
+
+
+
+{\flushleft\bf (6) L\_thcbtbl テーブル  }
+
+{\small\begin{verbatim}
+---【構成図】---------------------------------------------------------
+
+extern L_thcb* L_thcbtbl[1024];
+
+   L_thcbtbl
+   +----------+
+   |   [0]    |                                    L4_thread
+   |   [1]    |          thcb                 tid []----------+
+   |   [2]  --|-------->+-----------+    tid       |          |
+   |    :     |         |  tid      |------------->|          |
+   |    :     |         |           |              |          |
+   :    :     :         |-----------|              |          |
+   |    :     |         | inst-vars |<-------------|          |
+   |          |         |           |  UserDefined |          |
+   |          |         +-----------+              +----------+
+   |          |        ActiveObject    Handle      
+   +----------+
+   [0]; main thread
+   [1]: mediator thread
+   [2..]: thread/mbox/replybox or proxy
+-------------------------------------------------------------------------
+
+\end{verbatim}}
+
+プロセス内の全\verb|L_thcb| (スレッド、メッセージボックス等)は、
+\verb|L_thcbtbl| テーブルに登録されている。
+
+\verb|L_thcbtbl[0]| は、プロセスの{\bf メインスレッド}が登録されている。
+
+\verb|L_thcbtbl[1]| は、{\bf mediatorスレッド}が登録されている。
+プロセス外部からの非同期メッセージは、L4 IPC（同期型）を使って
+mediatorスレッドに届けられる。
+Mediatorスレッドは、非同期メッセージの宛先スレッドの
+メッセージボックスにメッセージを挿入する。
+
+
+
+{\flushleft\bf (7) 便宜定義}
+
+\begin{verbatim}
+---【便宜定義】-------------------------------------------------
+typedef L4_MsgTag_t     L_msgtag;
+
+#define MLABEL(msgtag)   ((msgtag).raw>>18)
+
+#define  TID2PROCX(tid)   (((tid.raw)>>24) & 0xff)
+#define  TID2TIDX(tid)    (((tid.raw)>>14) & 0x3ff)
+#define  TID2NODEX(tid)   (((tid.raw)>>6) & 0xff)
+#define  TID2VER(tid)     ((tid.raw) & 0x3f)
+#define  TID2THCB(tid)    (L_thcbtbl[TID2TIDX(tid)])
+#define  A2TIDX(a)        TID2TIDX(((L_thcb*)a)->tid)
+
+#define  INF   (-1)  // Infinite time in send/recv
+------------------------------------------------------------------
+\end{verbatim}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ L\_mbuf: メッセージバッファ}
+
+\begin{verbatim}
+---【定義】----------------------------------------------------------
+typedef union {
+  L4_Word_t   raw;
+  struct {
+    L4_Word_t   u:6;
+    L4_Word_t   t:6;
+    L4_Word_t   flags:4;
+    L4_Word_t   async:2 ;  //0: 動機メッセージ. 1: 非同期メッセージ, 2: 非同期返答
+    L4_Word_t   mlabel:14; //メッセージ識別子, 非同期返答メッセージの割符
+  } X;
+} L_MR0;
+
+typedef union {
+  L4_Word_t   raw;
+  struct {
+    L4_Word_t   ver:6; // Version
+    L4_Word_t   nodex_msgptn:8;  // msgptn = nump<<7 + nums<<4 + numi
+    L4_Word_t   tidx:10;
+    L4_Word_t   procx:8 ; // Num. of int-args
+  } X;
+} L_MR1;
+
+typedef struct  L_mbuf  L_mbuf;
+struct  L_mbuf {
+    struct L_mbuf  * next;
+    L4_ThreadId_t  sender;   // 非同期メッセージの場合、送り主のスレッドIDが入る
+    union {
+        L4_Msg_t       MRs;
+        struct{
+          L_MR0   mr0;
+          L_MR1   mr1;
+        }X;
+    };
+};
+
+\end{verbatim}
+
+
+非同期メッセージは、メッセージバッファ \verb|L_mbuf|に乗って運ばれる。
+\begin{itemize}
+\item  nextフィールドは、メッセージ行列を組むのに使われる。
+\item  senderフィールドは、非同期メッセージの場合、送り主のスレッドIDが入る
+\item  mr0フィールドには、L4のメッセージタグが載る。
+\item   mr1フィールドには、非同期メッセージのの宛先が載る。
+     Mediatorスレッドは、mr11が指す宛先にメッセージを挿入する。
+\end{itemize}
+
+
+{\small\begin{verbatim}
+
+---【メッセージバッファ構成図】-----------------------------------------------
+       MRs   Ex. "i2s2"
+       +-------------------+
+       |     next          | 
+       +-------------------+
+       |     sender        |    Destination of asynchronous message
+       +===================+
+       |     mr0: L_MR0    | 0  L4メッセージタグ
+       +-------------------+
+       |     mr1: L_MR1    | 1  非同期メッセージの宛先
+       +-------------------+
+       |      (e1)         | 2
+       +-------------------+
+       |      (e2)         | 3
+       +-------------------+
+       |     (size1)       | 4
+       +-------------------+
+       |     (str1)        |
+       |                   |
+       +-------------------+
+       |     (size2)       |
+       +-------------------+
+       |     (str2)        |
+       |                   |
+       +-------------------+
+--------------------------------------------------------------------------
+\end{verbatim}}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%
+\section{スレッド/メッセージボックスの生成}
+
+{\flushleft\bf (1) 生成}
+
+\begin{verbatim}
+---【Signature】------------------------------------------------------------------
+L_thcb* l_thread_create(void (*func)(void*), int stksize, void *objarea);          //[1]
+
+L_thcb* l_thread_create_args(void (*func)(void*), int stksize, void *objarea, 
+                             int argc, ...);                                      //[2]
+
+L_thcb* l_mbox_create(char *name);                                           //[3]
+
+void    l_thread_setname(char *name);                                        //[4]
+
+void    l_yield(L_thcb *thcb);                                               //[5]
+
+// L_tidx l_proxy_connect(char *name, int nodeid, L4_ThreadId_t mate);       //[6]
+----------------------------------------------------------------------------------
+\end{verbatim}
+
+\begin{description}
+\item[[1]]
+  \verb|l_thread_create(func, stksize, objarea)| は、ローカルスレッドを生成する。
+\begin{itemize}
+ \item  \verb|func|は、スレッドが実行する関数
+ \item  \verb|stksize| は、スタックサイズ(byte)
+ \item  \verb|objarea|は、能動オブジェクト（後述）の場合はインスタンス変数域を、
+       単なるスレッドの場合は\verb|nil|を指定する。\\
+       この値は、\verb|func( )|の第1引数に引き継がれる。\\
+     \verb|objarea|を指定した場合は、メモリ域の開放 free(objarea) はユーザ責任である。
+\end{itemize}
+
+\item[[2]]
+  スレッドの関数に \verb|objarea|以外の引数を引き継ぐ場合には、
+  \verb|l_thread_create_args(...)|を用いる。
+  \begin{itemize}
+  \item 引数は\verb|void*タイプ|に代入可能な値でなければならない。
+  \item 第1引数は必ず\verb|objarea|である。
+  \item  \verb|argc|で追加引数の数を指定し、その後ろに追加引数(式）を並べる。
+  \end{itemize}
+
+\item[[3]]
+  \verb|l_mbox_create(name)| は、独立したメッセージボックスを生成する。
+  \verb|name|はデバッグ用である。
+
+\item[[4]]
+  \verb|l_thread_setname(name)|は、スレッドに名前nameをつける。
+  name の長さは15 bytes 以下。デバッグなどに使う。
+
+\item[[5]]
+   \verb|l_yield(thcb)| は、実行を現スレッドからthcbスレッドに譲り渡す。
+   \verb|(thcb == nil)|の場合は、スケジューラが選ぶスレッドに譲り渡す。
+\end{description}
+
+
+{\flushleft\bf (2) 消去など}
+
+\begin{verbatim}
+
+---【Signature】------------------------------------------------------------------
+int  l_thread_kill(L_thcb *thcb);           //[1]
+
+void l_thread_exits(char *exitstr);         //[2]
+
+void l_thread_killall();                    //[3]
+
+void l_thread_exitsall(char *exitstr);      //[4]
+
+int  l_proxy_clear(L_thcb  *thcb);          //[5]
+
+void l_sleep_ms(unsigned  ms);              //[6]
+
+int  l_stkmargin0(unsigned int stklimit);   //[7]
+
+int  l_stkmargin() ;                        //[8]
+
+int  l_myprocx();                           //[9]
+----------------------------------------------------------------------------------
+\end{verbatim}
+
+
+... To Be Described ...
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ プロセス外部オブジェクトの登録}
+
+自プロセス外オブジェクトにアクセスするための proxy を設定する。
+
+...... To Be Implemented  ......
+
+
+\begin{verbatim}
+---【Signature】--------------------------------------------------------------
+L_thcb* l_thread_bind(char *name, L4_ThreadId_t mate, int attr);
+int     l_thread_unbind(L_thcb* thcb);
+------------------------------------------------------------------------------
+
+\end{verbatim}
+
+\hspace{4cm}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{能動オブジェクトの定義法}
+
+{\flushleft\bf (1) 基本}
+
+能動オブジェクトのインスタンス変数域は、\verb|L_thcb|域に連続して割り当てる。
+このために、第一要素を「\verb|L_thcb   _a;|」とする構造体で定義する。
+
+\begin{verbatim}
+---【例】---------------------------------------------------------------------
+    typedef struct Alpha{                               //[1]
+        L_thcb  _a;       // L_thcb の継承に相当
+        char    name[16];
+        int     age;
+        int     personalId;
+    } Alpha;
+
+    void alphafunc(Alpha *self)                         //[2]
+    {
+       ..... thread body .....
+       ....  self->age = 20; ....
+    }
+
+    Alpha     *a1;
+    L4_ThreadId_t  tid;
+
+    a1 = (Alpha*)malloc(sizeof(Alpha));                 //[3]
+    .... You can set value to instance vars like a1->age = 20; ...
+
+    l_create_thread(alphafunc, 4096, a1);               //[4]
+       // a1の値はalpafunc()の第1引数に引き継がれる
+       .....
+    tid = a1->_a.tid; //このようなアクセスももちろん可能
+       .....
+    l_kill_thread(a1);                                  //[5]
+    free(a1);
+-------------------------------------------------------------------
+\end{verbatim}
+
+\begin{description}
+\item[[1]]
+  \verb|Alpha|は能動オブジェクトのデータタイプを定義している。
+  第一要素は「\verb|L_thcb  _a;|」である。　
+
+\item[[2]]
+  \verb|alphafunc()| はAlphaオブジェクトのスレッドが実行する関数である。
+  第1引数には、[4]で述べるように能動オブジェクトのデータ域のアドレスが引き継がれる。
+  従って、\verb|self->name|などとしてインスタンス変数にアクセスできる。\\
+  メッセージ受信とその処理の書き方は、後で説明する。
+
+\item[[3]]  能動オブジェクトのメモリ域はユーザが割り当てを行う。
+
+\item[[4]]  能動オブジェクトの生成は、第3引数に能動オブジェクト域を指定して、\\
+  \verb|l_create_thread(alphafunc, 4096, a1);| \\
+  のように行う。生成が成功すれば第3引数の値が、失敗すれば\verb|nil|が反る。
+  第3引数の値は、スレッドが実行する関数[2]の第1引数として引き継がれる。
+
+\item[[5]]  能動オブジェクトの削除は\verb|l_kill_thread()|で行う。
+  能動オブジェクト域の解放は、ユーザ責任である。
+
+\end{description}
+
+{\flushleft\bf (2) 能動オブジェクト域とL4スレッドID間の変換}
+
+\begin{enumerate}
+\item  能動オブジェクトは\verb|L_thcb|を継承(拡張)したものである。
+      従って、両者のアドレスは一致する。
+
+\item  能動オブジェクトから、L4オブジェクトIDを求めるには。\\
+    \verb| L4_ThreadId_t  tid = self -> _a.tid;|
+
+\item  \verb|L_MYOBJ|マクロを使えば、
+   実行中のスレッドから自分の能動オブジェクト域を求められる。
+\begin{verbatim}
+---【L_MYOBJ マクロ】---------------------------------------
+  #define L_MYOBJ(type)   ((type)L4_UserDefinedHandle())
+    Ex.  Alpha  *me;
+         me = L_MYOBJ(Alpha*);
+---------------------------------------------------------------
+\end{verbatim}
+
+\item  \verb|L_AOBJ()|マクロを使えば、                                                                     
+   指定スレッドの能動オブジェクト域を求められる。
+\begin{verbatim}
+---【L_AOBJ() マクロ】---------------------------------------
+#define L_AOBJ(type, tid)  ((type)L4_UserDefinedHandleOf(tid))
+   Ex. Alpha *you;
+       you = L_AOBJ(Alpha*, tid);
+---------------------------------------------------------------
+\end{verbatim}
+
+\end{enumerate}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{メッセージバッファ及びL4仮想レジスタMRsの設定}
+
+同期メッセージは、L4マイクロカーネルのメッセージ機能そのままである。
+L4スレッドは64ワードの''仮想''レジスタ MRs を有している。
+送信は、メッセージを MRs に設定して\verb|L4_send()|を呼び出す。
+スレッドがメッセージを受信しようとする
+(Ex. \verb|L4_wait()、L4_receive()|)と、
+メッセージが到着した時にその値は MRs に設定される。
+
+非同期メッセージは、メッセージバッファ\verb|L_mbuf|に載せて送られ、
+宛先のメッセージボックス \verb|L_mbox|に挿入される。
+
+この説明から分かるように、メッセージの送受信には
+''仮想''レジスタ MRs あるいは、メッセージバッファ\verb|L_mbuf|
+のデータの設定や取り出しを行う。
+この操作を簡便に行うのが\verb|l_putarg(), l_getarg()| である。
+
+
+\begin{verbatim}
+---【Signature】----------------------------------------------------------
+○　mbuf はメッセージバッファ L_mbuf へのポインタであるが、値が nil の場合は、
+  L4スレッドの”仮想"レジスタ MRs が使われる
+
+L_mbuf* l_putarg(L_mbuf *mbuf, int mlabel, char *fmt, ...);     //[1]
+  Ex.  L_mbuf  *mbuf;
+       char buf1[...], buf2[...];
+       mbuf = l_putarg(mbuf, 747, "i2s2", e1, e2, buf1, len1, buf2, len2)
+
+int  l_getarg(L_mbuf *mbuf, char *fmt, ...);                    //[2]
+  Ex.  int  mlabel
+       int  x1, x2;
+       char bufa[...],  bufb[...];
+       int  lena,  lenb;
+       mlabel = l_getarg(mbuf, "i2s2", &x1, &x2, bufa, &lena, bufb, &lenb)
+---------------------------------------------------------------------------------
+\end{verbatim}
+
+
+以下において、第1引数 mbuf が nil の場合は``仮想''レジスタ MRs ,
+mbuf が否nil の場合はメッセージバッファを意味する。
+
+\begin{description}
+\item[[1]]
+\verb|l_putarg(mbuf, mlabel, fmt, ...)| は, 送信データ設定を行う。
+mlabelはメッセージの先頭ワードのmlabelとなる。
+fmtは引数のタイプと数を``iMsN''の形で指定する。M,Nは整数値である。
+例えば、``i2s1''はsizeof(int)の値を2個、byte列を１個持つことを意味する。\\
+
+【例】\verb|l_putarg(mbuf, 747, "i2s2", e1, e2, buf1, len1, buf2, len2)|
+  は、mlabelに747を設定、
+  2個の``i''型の引数（e1, e2) と、
+  2個の``s''型の引数（開始アドレスとbyte長で与える）
+  を設定する。
+
+
+\item[[2]]
+  \verb|l_getarg(mbuf,  fmt, ...)| は, 受信データ取り出しを行う。  \\
+
+【例】 \verb|mlabel = l_getarg(mbuf, "i2s2", &x1, &x2, bufa, &lena, bufb, &lenb);|
+  の返り値はメッセージのmlabelである。
+  引数は''i2s2''に従い第1, 第2引数は変数x1, x2 に代入され、
+  第3、第4引数はバッファ bufa （サイズはlena),  bufb(サイズはlenb)
+  lena, lenbにはバッファ長を入れておく。
+  実行後には実際に代入されたサイズが設定されている。
+
+\end{description}
+
+
+
+%%%%%%%%%%%%%%%%%
+\section{Timeout}
+
+\begin{verbatim}
+
+\end{verbatim}
+
+\hspace{3cm}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{同期メッセージの送受信}
+
+\begin{verbatim}
+---【Signature】------------------------------------------------------------------
+L_msgtag  l_send0(L_thcb *thcb, int msec, L_mbuf *mbuf);           //[1]
+  Ex. L_mbuf *mbuf;
+      mbuf = l_putarg(nil, mlabel, "i2s1", e1, e2, &buf, sizeof(buf));
+      msgtag = l_send0(thcb, INF, mbuf);
+
+L_msgtag  l_recv0(L4_ThreadId_t *client, int msec, L_mbuf **mbuf);  //[2]
+     (第1引数のタイプは L4_ThreadId_t であり、l_reply0()の返答先として使われる。
+      L_thcb* でないことに注意。）
+  Ex. msgtag = l_recv(&client, INF, nil);
+      n = l_getarg(nil, "i2s1", &x, &y, &buf2, &sz2);
+
+L_msgtag  l_recvfrom0(L4_ThreadId_t client, int msec, L_mbuf **mbuf); //[3]
+  Ex. msgtag = l_recvfrom(client, INF, nil);
+
+L_msgtag  l_reply0(L4_ThreadId_t client, L_mbuf *mbuf);              //[4]
+  Ex. msgtag = l_reply0(client, mbuf);
+
+L_msgtag  l_call0(L_thcb *thcb, int smsec, int rmsec, L_mbuf *mbuf); //[5]
+  Ex. msgtag = l_call(thcb, INF, INF, mbuf);
+-------------------------------------------------------------------------------
+\end{verbatim}
+
+\begin{description}
+\item[[1]]
+  \verb|l_send0(thcb, msec, mbuf)| は、宛先スレッドに同期メッセージを送る。
+ 
+  \begin{itemize}
+  \item  第1引数 thcb は、宛先スレッド。
+  \item  第2引数 msec は最大待ち時間である。INF(= -1)を指定すると相手が受信するまで待つ。
+  \item  第3引数  mbuf はメッセージバッファを示す、
+    \verb|nil|を設定すると L4スレッドの``仮想''レジスターMRs が使われる。
+  \end{itemize}
+
+  【例】「\verb|mbuf = l_putarg(nil, mlabel, "i2s1", e1, e2, &buf, sizeof(buf));|」\\
+    は、``仮想''レジスターMRsに引数などが設定される。
+    返り値は第1引数の値、この例ではnil、である。\\
+    「\verb|msgtag = l_send0(thcb, INF, mbuf);|」\\
+    は、``仮想''レジスターMRsに設定されたメッセージ(mbuf == nilなので)を
+    thcb に同期メッセージとして送る。
+
+
+\item[[2]]
+  \verb|l_recv0(&client, msec, &mbufp);|は、動機メッセージを受信する。
+
+  \begin{itemize}
+  \item  同期メッセージを受信したら第1引数に送信者の\verb|L4_ThreadId_t|値
+    (\verb|L_thcg*| ではない）が代入される。
+   この値は \verb|L_reply0()|で返答を返すときの宛先として使う。
+
+  \item   第2引数は最大待ち時間である。
+          INF(== -1)を指定すると、メッセージが到着するまで待つ。
+
+  \item  第3引数は、受信メッセージの置き場所を示す。
+  　第3引数が nil の場合は, メッセージはL4スレッドの``仮想''レジスターMRs に載せられたままである。
+    第3引数が nil でない場合にはメッセージバッファのアドレスが設定される。
+  \end{itemize}
+   
+
+  【例】\verb|msgtag = l_recv(&client, INF, nil);| \\
+       は、``仮想''レジスターMRs に同期メッセージを受け入れる。\\
+   \verb|n = l_getarg(nil, "i2s1", &x, &y, &buf2, &sz2);| \\
+    は、 受信したメッセージの各引数を指定された変数に設定する。
+
+\item[[3]]
+  \verb|l_recvfrom0(client, msec, &mbufp)| は、指定された client
+   (\verb|L4_ThreadId_t| タイプであることに注意)
+  からメッセージを受信する。
+
+\item[[4]]
+  \verb|l_reply0(client, mbuf);| は、指定されたclient
+  (\verb|L4_ThreadId_t| タイプであることに注意)に返答メッセージを返す。
+
+\item[[5]]
+  \verb|l_call0(thcb, smsec, rmsec, mbuf)|
+   は、\verb|l_send()| と \verb|l_recvreply()|の組み合わせである。
+
+\end{description}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{非同期メッセージの送受信}
+
+\begin{verbatim}
+---【Signature】------------------------------------------------------------------
+L_msgtag  l_asend0(L_thcb *dest, int msec, L_mbuf * mbuf);     //[1]
+     (第2引数 msec は、無効果である。l_send0()との対称性のため）
+  Ex. mbuf = l_putarg(mbuf, mlabel, ”i2s1”, e1, e2, &buf, sizeof(buf));
+      msgtag = l_asend0(dest, 0, mbuf);
+
+
+L_msgtag  l_arecv0(L_thcb  *mbox , int msec, L_mbuf **mbuf);    //[2]
+   ○ 第1引数mbox がnilの時は、自スレッドが持つメッセージボックスから受信する。\\
+     非 nil の場合は、mbox が指定するメッセージボックスから受信する。
+
+   ○ 引数”msec” は、 INF (-1) または 0.
+          INF: メッセージが到着するまで待つ。
+          0: すでにメッセージが到着していなければ、即戻る。
+   ○ 受信メッセージバッファの　L_mbuf.sender に、送り主の L4_ThreadId_t が入っている。
+  Ex. L_mbuf *mbuf; 
+      L4_ThreadId_t  client;
+      mbuf = l_arecv0(nil, INF, &mbuf); // 自メッセージボックスから受信
+      mbuf = l_arecv0(mbox, INF, &mbuf); // mboxが指すメッセージボックスから受信
+      n = l_getarg(mbuf, ”i2s1”, &x, &y, &buf2, &sz2);
+      client = mbuf->X.mr1;
+
+L_msgtag  l_areply0(L4_ThreadId_t client, L_mbuf * mbuf);       //[3]
+     (注意) 第1引数は L4_ThreadId_t である。L_thcb* タイプではない。
+  Ex. mbuf = l_putarg(mbuf, mlabel, ``i1s1'', e1, &buf, sizeof(buf));
+      n = l_asend0(client, mbuf);
+
+int  l_arecvreply0(int rectime, L_mbuf **mbuf, int tnum, ...); //[4]
+   ○　非同期返答の受信は、次節で説明する。
+
+L_msgtag  l_acall0(L_thcb  *thcb, int recmsec, L_mbuf *mbuf);   //[5]
+  Ex. rc = l_acall0(dest, INF, INF, mbuf);
+
+----------------------------------------------------------------------------
+\end{verbatim}
+
+
+\begin{description}
+\item[[1]]
+  \verb|l_asend0(dest, msec, mbuf);| は、destスレッドに非同期メッセージを送る。
+   msec は無視される。
+   mbuf はメッセージバッファである。\\
+
+  【例】 \verb|mbuf = l_putarg(mbuf, mlabel, ``i2s1'', e1, e2, &buf, sizeof(buf));|
+    は、mbufに引数などが設定される。
+    返り値は第1引数の値と同じ(この例ではmbuf)。\\
+    \verb|msgtag = l_asend0(dest, 0, mbuf);|
+    は、mbufに設定された内容を
+    destスレッド に非同期メッセージとして送る。
+
+\item[[2]]
+  \verb|l_arecv0(mbox, msec, &mbufp);|は、非同期メッセージの受信である。
+
+  \begin{itemize}
+  \item 第1引数： スレッドの自前メッセージボックスから受信する場合には、
+    第1引数を nil とする。
+    独立メッセージボックスから受信する場合には、第1引数にその \verb|L_thcb *| 値を
+    指定する。
+  \item 第2引数： 第2引数が(==0)であると、メッセージが到着済みでなければ即nilを返す。
+     (!=0)の場合は、メッセージが到着するまで待つ。\\
+  \item  第3引数：　受信したメッセージバッファのアドレスが設定される。
+
+  \item  非同期目セージの送り主の \verb|L4_ThreadId_t|値は、
+        受信メッセージバッファの　\verb|mbuf->sender|フィールドに入っている。
+        \verb|l_areply()|で返答を返すときに使われる。
+
+  【例】\verb|msgtag = l_recv(&client, INF, nil);| \\
+     は、 L4スレッド``仮想''レジスターMRs に同期メッセージを受け入れる。\\
+   \verb|n = l_getarg(nil, "i2s1", &x, &y, &buf2, &sz2);| \\
+   は、受信したメッセージの各引数を指定された変数に設定する。
+
+   \end{itemize}
+
+\item[[3]]
+  \verb|l_areply0(client,  mbuf)| は、指定された client
+   (\verb|L4_ThreadId_t| タイプであることに注意)
+  にmbufが指す返答メッセージを送る。
+
+\item[[4]]
+  \verb|l_arecvreply0(rectime, &mbuf, tnum, ...)| は、
+  非同期返答メッセージ(Future message)を受ける。
+  要求メッセージと返答メッセージの対応をとる仕組みあり、
+  ....非同期返答メッセージ..... にて説明する。　　
+
+\item[[5]]
+  \verb|l_acall0(dest, recmsec,  &mbuf)| は、
+   \verb|l_asend0()|と\verb|a_arecv0()| の組み合わせである。
+
+\end{description}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{非同期返答メッセージ}
+
+{\flushleft\bf (1) 非同期返答メッセージの返送と受理}
+
+\begin{verbatim}
+---【Signature】------------------------------------------------------------------
+
+L_msgtag  l_areply0(L4_ThreadId_t client, L_mbuf * mbuf);       //[3]
+  ○  第1引数は、L4_ThreadId_t タイプである。 L_thcb* ではない。
+  Ex. mbuf = l_putarg(mbuf, mlabel, ``i1s1'', e1, &buf, sizeof(buf));
+      n = l_asend0(client, mbuf);
+
+int  l_arecvreply0(int rectime, L_mbuf **mbuf, int tnum, ...); //[4]
+  ○　第1引数：(== 0) 待たない。既に返答が到着していれがそれが返される。
+              (!= 0) 返答が届くまで待つ。
+  ○　第2引数: ここに返答の載ったメッセージのアドレスが代入される。
+  
+  ○　第3引数：Tally（割符）の数
+  ○　第4...引数：　Tallyのならび。
+　○　返り値：マッチしたTallyの番号
+
+L_msgtag  l_acall0(L_thcb  *thcb, int recmsec, L_mbuf *mbuf);   //[5]
+  Ex. rc = l_acall0(dest, INF, INF, mbuf);
+
+----------------------------------------------------------------------------
+\end{verbatim}
+
+
+\begin{description}
+\item[[1]]
+   要求メッセージを送る時 (\verb|l_asend0(dest, msec, mbuf)| )に、
+   要求メッセージの第1引数を要求メッセージと返答メッセージの対応をとる
+         tally (割符)として使う。
+
+\item[[3]]
+  \verb|l_areply0(client,  mbuf)| は、指定された client
+   (\verb|L4_ThreadId_t| タイプであることに注意)
+  にmbufが指す返答メッセージを送る。
+
+\item[[4]]
+  \verb|l_arecvreply0(rectime, &mbuf, tnum, ...)| は、
+  非同期返答メッセージ(Future message)を受ける。
+  要求メッセージと返答メッセージの対応をとる仕組みとして、
+  tally (割符）が使われる。
+
+   \begin{itemize}
+   \item メッセージのmlabelフィールドはtally として使われる。
+   \item  Tallyの個数は可変である。引数tnum に tally の個数を設定する。
+   \item   (tnum == 0)の場合は、tallyチェックは行わず、最初の返答メッセージが選ばれる。
+   \item   (tnum != 0)の場合、n番目の tally がマッチしたら n ( n = 1, 2, ...) を返す。
+   \end{itemize}
+
+\item[[5]]
+  \verb|l_acall0(dest, recmsec,  &mbuf)| は、
+   \verb|l_asend0()|と\verb|a_arecv0()| の組み合わせである。
+
+\end{description}
+
+
+
+{\flushleft\bf (2) 非同期返答の使い方}
+
+非同期返答メッセージは、要求メッセージに対応させる必要がある。
+また、複数のスレッドに要求メッセージを送って、
+対応をとって適切に返答を受ける必要がある。
+
+「対応」をとるために要求メッセージにtally(割符) という整数データをのせ、
+非同期返答メッセージ受信自にtally のチェックを行えるようにした。
+要求メッセージでは、第1引数をtallyとして使う。
+
+非同期返答メッセージを返すスレッドは、
+メッセージバッファ第1ワードのmlabelフィールドにtally値を設定して、
+\verb|l_areply()| を実行する。
+つまり、返答メッセージのmlabaelフィールドは tally として使われる。
+
+
+\begin{verbatim}
+
+---【例】------------------------------------------------------------------
+        L_mbuf *mbuf1, *mbuf2, mbuf3;
+        l_putarg(mbuf1, label, ”i2s2”, tally1, e2, buf1, len1, buf2, len2);
+                                         // tally1 が割符
+        l_asend(alpha, INF, mbuf1);  //alphaスレッドに非同期メッセージを送る
+
+        l_putarg(mbuf2, label, ”i2s1”, tally2, e3, buf3, len3);
+                                      // tally2が割符
+        l_asend(beta, INF, mbuf2);  //betaスレッドに非同期メッセージを送る
+           .....
+        // 処理を続行し、返答が必要になったら  l_arecvreply() を呼び出す
+
+        k = l_arecvreply(INF, &mbuf3, 2, tally1, tally2);
+            // tally1 もしくは tally2 を持つ返答を受理する。
+            // 非同期メッセージが n番目のtally を持っていたら、n を返す。
+        switch(k){
+        case 1: l_getarg(mbuf, ”i2”, &x, &y);  // tally1 
+                .....
+                break;
+        case 2: l_getarg(mbuf, ”i1s1”, &z, &ss, &sz); // tally2
+                ........
+        }
+        .............
+----------------------------------------------------------------------------
+\end{verbatim}
+
+
+{\flushleft\bf (3) 非同期返答の実装}
+
+各スレッドは、非同期返答を受けるためのReplybox ( \verb|L_thcb.replybox| )
+を有している。
+非同期変数は Replybox に挿入される。
+\verb|l_arecvreply( )| は、tally が一致する返答メッセージが到着しているかを
+チェックし、有れば情報を返し、無ければ返答メッセージの到着を待つ。
+
+
+\begin{verbatim}
+---【実装の仕組み】-------------------------------------------------------------
+       Client                                Servert
+   []--------------+                     []--------------+
+    |msgbox ooo    |                      |msgbox ooo    |
+    |replybox oo   |                      |replybox      |
+    |              |                      |              |
+    | l_asend( )   | -------------------> |              |
+    |              |<------------------   |              |
+    |              |tally;request-reply   |              |
+    | l_arecvreply |      maching         |              |
+    |              |      Non-ordered     |              |
+    +--------------+                      +--------------+
+
+----------------------------------------------------------------------------
+\end{verbatim}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{能動オブジェクトプログラム例}
+
+例として、マウスとキーボードからの入力を表示するWindowプログラムを考える。
+Windowはスクリーン上に任意個生成できるものとする。
+マウス、キーボード及びWindow は並行動作するので、能動オブジェクト(ActObj)で作る。
+
+以下のプログラム例で、なんとなくイメージが掴んでいただきたい。
+
+\begin{verbatim}
+---【例】-------------------------------------------------------------------
+enum{MOUSE, KEYBD, WINDOW,  ....};
+typedef struct Window   Window;
+Window  *w1, *w2, *currentwindow;
+
+//---- マウスActObj -------------------
+typedef struct{
+    L4_thcb  _a;
+    int  x, y;
+    .....
+} Mouse;
+
+void mousefunc(Mouse *self)
+{
+     ...............
+      l_putarg(mbuf, MOUSE, "i5", typ, self->x, self->y, dx, dy);
+      l_asend0(currentwindow, INF, mbuf);  //Current window にメッセージを送る
+      .........
+}
+
+Mouse *mouseobj = (Mouse*)malloc(sizeof(Mouse));
+l_create_thread(mousefunc, 4096, mouseobj); //マウスActObjを生成
+
+//--------キーボード　ActObj --------------------
+typedef struct{
+    L4_thcb  _a;
+    char    line[128]
+    .....
+} Keyboard;
+
+void keyboardfunc(Keyboard *self )
+{
+     ...............
+      l_putarg(mbuf, KEYBD, "s1", len, self->line, len);
+      l_asend0(currentwindow, INF, mbuf); //Current window にメッセージを送る
+      ...........
+}
+
+Keyboard *keybdobj = (Keyboard*)malloc(sizeof(Keyboard));
+l_create_thread(keyboardfunc, 4096, keybdobj); //キーボードActObjを生成
+
+//---- Window ActObj ------------------- 
+struct Window{
+    L4_thcb  _a;
+    .....
+};
+
+void windowfunc(Window *self)
+{
+     ...............
+    for(;;){
+       tag = l_arecv(     mbuf);
+       switch(MLABEL(tag)){
+       KEYBD:    // キーボードActObjからメッセージ受信の場合
+         {
+             char  line[128]; 
+            l_getarg(mbuf, "s1", line, &len);  //
+            ........
+         }
+       MOUSE: // マウスActObjからメッセージ受信の場合
+         { int  c1, x, y, dx, dy;
+            l_getarg(mbuf, "i5", &c1, &x, &y, &dx, &dy);
+            .......
+         }
+         .....
+       }
+    }
+}
+
+
+w1 = (Worker*)malloc(sizeof(Worker));
+l_create_thread(workerfunc, 4096, workerobj); //Window ActObjを生成
+
+
+----------------------------------------------------------------------------
+\end{verbatim}
+
+
+\end{document}

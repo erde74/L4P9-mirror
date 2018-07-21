@@ -1,0 +1,321 @@
+*******************************************************
+*        LP49 Memory layout                           *
+*        (C) KM   080506                              *
+*******************************************************
+
+
+
++------------------------------------------------+
+|    L4 KIP_BASE and UTCB_BASE                   | 
++------------------------------------------------+
+
+<<< Files >>>
+	include/lp49/lp49.h
+
+<<< Definition >>>
+
+#define  KIP_BASE   0x100000
+
+#define  UTCB_BASE  0x200000
+ 
+#define  UTCB_LIMIT     64
+
+
+[ThreadID]
+ THREADID
+   +---8----+--10-----+----14-----+
+   |proc_nr |local_nr | version   |
+   +--------+---------+-----------+
+
+#define  MX_PAGER      0xCC001        // [0, 51, 1]
+#define  PROC_MANAGER  0X1000002      // [1, 0, 2]
+#define  SRV_MANAGER   0X1000002      // [1, 0, 2]
+
+
+
++------------------------------------------------+
+|          UTCB area                             | 
++------------------------------------------------+
+
+<<< include/lp49/lp49.h >>>
+
++ Currently, followings are defined in this file.
+
+//-------------------------------
+#define  KIP_BASE   0x100000
+
+#define  UTCB_BASE  0x200000
+                                                                                            
+#define  UTCB_LIMIT     64
+
+
+<<< src/libc/libl4com/l4-support.c >>>
+
+* To be redefined.
+
+int get_new_tid_and_utcb (L4_ThreadId_t *tid, uint *utcb)
+{
+  static uint   th_num_base ;
+  static uint   version ;
+  static uint   th_indx = 0;
+  static uint   utcb_size;
+  static uint   utcb_base;
+  static void * kip = 0;
+  static L4_ThreadId_t  myself;
+                                                                                            
+  if (kip == 0){
+    myself = L4_Myself();
+    kip = L4_GetKernelInterface();
+    utcb_size = L4_UtcbSize(kip);
+    utcb_base = L4_MyLocalId().raw & ~(utcb_size - 1);
+    th_num_base = L4_ThreadNo(myself);
+    version = L4_Version(myself);
+  }
+                                                                                            
+  if (th_indx ++ > 16)
+    L4_KDB_Enter("Num of threads >= 16: to be extended");
+                                                                                            
+  *tid = L4_GlobalId (th_num_base + th_indx, version);
+  *utcb = utcb_base + utcb_size * th_indx;
+  return 1;
+}
+
+
+
+<<< src/libc/libl4thread/l4thread.c >>>
+
+                                                                                            
+static void init_thread_tbl() // FIXME: no-reentrant --> thread unsafe
+{
+    int  i;
+    if (thd_tbl.kip != 0)   return;
+                                                                                            
+    thd_tbl.root_tid =  L4_Myself();
+    thd_tbl.pager_tid = L4_Pager();
+    thd_tbl.kip = L4_GetKernelInterface();
+    thd_tbl.utcb_size = L4_UtcbSize(thd_tbl.kip);
+    thd_tbl.utcb_base = L4_MyLocalId().raw & ~(thd_tbl.utcb_size - 1);
+    thd_tbl.th_num_base = L4_ThreadNo(thd_tbl.root_tid);
+    thd_tbl.version = L4_Version(thd_tbl.root_tid);
+    thd_tbl.thnum_max = 63; //%%%
+    thd_tbl.thcnt = 0;
+                                                                                            
+    thd_tbl.used[0]= 1;
+    for (i=1; i<256; i++)
+        thd_tbl.used[i] = 0;
+}
+                                                                                            
+                                                                                            
+// no-reentrant --> thread unsafe --> Lock must be applied.
+static int assign_tid_and_utcb (L4_ThreadId_t *tid, L4_Word_t  *utcb)
+{
+    int  i;
+                                                                                            
+    if (thd_tbl.kip == 0)   init_thread_tbl();
+                                                                                            
+    for (i = 0; i < thd_tbl.thnum_max; i++) {
+       if (thd_tbl.used[i] == 0) {
+          thd_tbl.thcnt ++;
+          thd_tbl.used[i] = 1;
+          *tid =  L4_GlobalId (thd_tbl.th_num_base + i, thd_tbl.version);
+          *utcb = thd_tbl.utcb_base + thd_tbl.utcb_size * i;
+          return 1;
+       }
+    }
+    return  0;
+}
+                                                                                            
+
+
+
++------------------------------------------------+
+|    Process memory region                       | 
++------------------------------------------------+
+
+<<< QSH command >>> 
+
+	pgmap  <processnr>
+
+<<< hvm process >>>
+
+
+<<< pc process >>>
+
+	[      -9FE000)     	stack
+	[A00000-A65000)     	text
+	[A66000-B53000)		data
+	[1400000-1800000)   4M	heap for malloc()
+
+	[8F0000-900000)	    	etherreset.
+				-> accessed in pci.c:pcirouting().
+	[0-2000)		sd
+	[40000000-40030000)	floppyreset
+
+
+<<< qsh process >>>
+
+	[0-1000)	?
+	[      -dfe000)		stack
+	[e00000-e18000)		test
+	[e19000-e2a000)		data
+
+
+
++------------------------------------------------+
+|    mx-pager in HVM                             | 
++------------------------------------------------+
+
+[What is this]
+
+   Pager for LP49.
+   This thread runs in the HVM process.	
+
+[HVM-address]
+ 
+(1)  All avialable physycal pages are mapped to the HVM process
+   logical_address = physical_address + 0x80000000  (2 Giga)
+
+    0G         1G    
+    +----------+	
+    |          |    Physical memory
+    +----------+	
+    \       \
+     \       +------------------+
+      +------------------+       \
+                          \       \ 
+    +----------+-----------+----------+----------+	
+    |          |           |          |          |   HVM process space
+    +----------+-----------+----------+----------+	
+    0G         1G          2G         3G 
+
+
+(2) Messages mx_pager accepts.
+
+	(a) THREAD_CONTROL
+	(b) SPACE_CONTROL
+	(c) ASSOCIATE_INTR
+	(d) DEASSOCIATER_INTR
+	(e) PROC2PROC_COPY
+	(f) PROC_MEMSET
+	(g) MM_FORK
+	(h) CHK_PGMAP  (for debugging )
+	(i) START_VIA_PAGER
+	(j) MM_FREESPACE
+	(k) ALLOC_DMA  ?
+	(l) PHYS_MEM_ALLOC
+	(m) GET_PADDR
+	(n) Page_fault
+ 
+
+(3) To be refined.
+
+    Mx-pager code has become very very dirty.
+    This should be refined totally.
+
+
+
++------------------------------------------------+
+|   Heap area for PC-process malloc()            | 
++------------------------------------------------+
+
+<<< Files >>>
+
+(1) src/9/port/xalloc-l4.c
+(2) src/9/port/alloc.c
+
+
+<<< Heap area >>>
+
+(1) xalloc-l4.c includes:
+   #define  XMAP_LADDR     ...
+   #define  XMAP_PADDR     ...
+   #define  XMAP_LOG2SIZE  ...
+
+(2) (2 ** XMAP_LOG2SIZE) bytes are reserved for the heap area.
+
+(3) Heap area is linearly mapped to physucal memory, and 
+   logical-physical address translation is very simple.
+
+  <physical_addr> == <logical_addr> - XMAP_LADDR + XMAP_PADDR
+
+(4) XMAP_LADDR, XMAP_PADDR  and XMAP_LOG2SIZE must satisfy 
+    the L4 Flex page constraint.	
+
+(5) 
+
+
+<<< program >>>
+
+//---------- fns.h ------------------
+#define KADDR(a)        kaddr(a)
+#define PADDR(a)        paddr((void*)(a))
+
+
+//--- port/xalloc-l4.c ------------
+#define  XMAP_LADDR      20*1024*1024    //20 Meg
+#define  XMAP_PADDR      12*1024*1024    //12 Meg
+#define  XMAP_LOG2SIZE   22              // 4MB = (1<<22)
+#define  XPOOLSIZE       (1<<XMAP_LOG2SIZE)
+
+
+ulong paddr(void* laddr)
+{
+#if 1
+    L4_Msg_t msgreg = {{0}};
+    L4_MsgTag_t tag;
+    L4_ThreadId_t mx_pager;
+    mx_pager.raw = MX_PAGER;
+    L4_Word_t arg[2];
+
+    //  DBGPRN(">>%s va=0x%x\n", __FUNCTION__, (uint)laddr);
+    L4_MsgClear(&msgreg);
+    L4_MsgAppendWord(&msgreg, (L4_Word_t)laddr);
+    L4_Set_MsgLabel(&msgreg, GET_PADDR);
+
+    L4_MsgLoad(&msgreg);
+    tag = L4_Call(mx_pager);
+
+    L4_MsgStore(tag, &msgreg);
+    L4_StoreMRs(1, 2, arg);
+
+    //  DBGPRN("<<%s  ret=0x%x\n", __FUNCTION__, arg[0]);
+    return arg[0];
+#else
+    return  x_l2paddr((ulong)laddr);
+#endif
+}
+
+
+void* kaddr(ulong paddr)
+{
+    return  (void*)x_p2laddr(paddr);
+}
+
+
+
+ulong x_l2paddr(ulong laddr)
+{
+    return  laddr - XMAP_LADDR + XMAP_PADDR;
+}
+
+ulong x_p2laddr(ulong paddr)
+{
+    return  paddr - XMAP_PADDR + XMAP_LADDR;
+}
+
+
+
+<<< malloc() >>>
+
+(1) Malloc() in the PC process returned zero-cleared memory.
+
+
+
+<<< TODO >>>
+  
+* Current implementation is merely tetative.
+* You are hoped to refine the code.
+	
+
+
+

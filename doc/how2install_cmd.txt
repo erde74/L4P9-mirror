@@ -1,0 +1,125 @@
+***************************************************
+*    How to install commands from cmd.zip file    *
+*                                                 *
+***************************************************
+
+<<< Background >>>
+
+[1] As removable memory, current LP49 supports 
+    only USB memory and floppy disk. 
+
+[2] LP49 supports only USB-1.1 UHCI device; 
+    USB-2.0 and OHCI devices are NOT YET supported. 
+
+[3] A floppy disk is too small to install commands.
+   
+[4] ZIP file format will partially solve this problem.
+
+
+
+<<< zip and unzip commands >>>
+
+	zip  -f <zipfile>  sourcefiles....
+
+	unzip -f <zipfile>
+
+
+
+
+<<< How to make cmd.zip file >>>
+
+[1]  src/cmd/bin/Makefile will produce 	"cmd.zip" file.
+
+	% cd src/cmd/bin
+  	% make 
+
+	===> cmd.zip is produced in this directory.
+       
+
+or 
+[2]  src/Makefile
+	
+	% cd src
+	% make clean
+	% make
+	
+	===> src/cmd/bin/cmd.zip 
+
+
+<<< lp49-boot.fd >>>
+
+[1] Fron now (2008/05/30) on, 
+    the boot floppy lp49-boot.fd includes cmd.zip file.
+
+[2] Contents of lp49-boot.fd
+
+	kickstart-0804.gz  
+	l4ka-0804.gz  
+	pingpong.gz  
+	sigma0-0804.gz
+ 
+	a/
+		dossrv.gz  
+	  	hvm.gz  
+		pc.gz  
+		qsh.gz
+ 
+	b/
+		cmd.zip    ---- Here is the file !
+ 
+	boot/
+		grub/
+ 			menu.lst  
+			stage1  
+			stage2
+
+[4] How to copy/install commands onto LP49 RAM file (/tmp) ?
+
+	(4-1) On startup, there is "cmd.zip" file on /t/b directory.
+
+		LP49[/]: ls  /t/b/
+		cmd.zip
+
+	(4-2) To unzip the file to /tmp (RAM File system) 
+	      
+		 LP49[/]: cd /tmp
+		 LP49[/tmp]: unzip -f /t/b/cmd.zip
+		 LP49[/tmp]: ls
+		===>  You can see unzipped commands.
+
+	(4-3) Or you can unzip to HDD File system, of course.
+
+        (4-5)  Try commands:
+
+		LP49[/tmp]:  spawn  ex2 
+		LP49[/tmp]:  cd
+		LP49[/]:  spawn  /t/ex2
+
+
+
+[5] How to copy/install commands onto LP49 HDD/DOS file (/tmp) ?
+
+	(4-1) Make sure there is  "cmd.zip" file on /t/b directory.
+
+		LP49[/]: ls  /t/b/
+		cmd.zip
+
+	(4-2) Bind HDD and mount the DOS file systerm.
+	      
+		LP49[/]: bind  -a  #S  /dev
+		LP49[/]: ls  /dev/sdC0/dos-0
+		LP49[/]: mount -ac /srv/dos  /work  /dev/sdC0/dos-0
+		LP49[/]: cd  /work
+		LP49[/work]: 
+		===>  DOS file server is mounted on /work.
+
+        (4-5)  Unzip cmd.zip file
+
+		LP49[/work]:  unzip -f /t/b/cmd.zip
+		LP49[/work]:  ls
+
+
+
+
+
+

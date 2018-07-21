@@ -1,0 +1,53 @@
+# SYSCALL_ID   RETURN_TYPE   SYSCALL_NAME   ARGUMENTS
+ 0 long     sysr1      (ulong* arg1)				// a
+ 1 int      _errstr    (char* arg1)				// s
+ 2 int      bind       (char* arg1, char* arg2, int arg3)	// ssi
+ 3 int      chdir      (char* arg1)				// s
+ 4 int      close      (int arg1)				// i
+ 5 int      dup        (int arg1, int arg2)			// ii
+ 6 long     alarm      (ulong arg1)				// i
+ 7 int      exec       (char* arg1, char* arg2[])		// s?
+ 8 void     exits      (char* arg1)				// s
+ 9 int      _fsession  (char* arg1, void* arg2, int arg3)	// sai
+10 int      fauth      (int arg1, char* arg2)			// is
+11 int      _fstat     (int arg1, char* arg2)			// is
+12 void*    segbrk     (void* arg1, void* arg2)			// aa
+13 int      _mount     (int arg1, char* arg2, int arg3, char* arg4)	// isis
+14 int      open       (char* arg1, int arg2)			// si
+15 long     read       (int arg1, void* arg2, long arg3)	// iai
+16 long     oseek      (int arg1, long arg2, int arg3)		// iii
+17 int      sleep      (long arg1)				// i
+18 int      _stat      (char* arg1, char* arg2)			// ss
+19 int      rfork      (int arg1)				// i
+20 long     write      (int arg1, void* arg2, long arg3)	// iai
+21 int      pipe       (int* arg1)				// a
+22 int      create     (char* arg1, int arg2, ulong arg3)	// sii
+23 int      fd2path    (int arg1, char* arg2, int arg3)		// isi
+24 int      brk        (void* arg1)				// a
+25 int      remove     (char* arg1)				// s
+26 int      _wstat     (char* arg1, char* arg2)			// ss
+27 int      _fwstat    (int arg1, char* arg2)			// is
+28 int      notify     (void(*arg1)(void*, char*))		// a
+29 int      noted      (int arg1)				// i
+30 void*    segattach  (int arg1, char* arg2, void* arg3, ulong arg4)	// isai
+31 int      segdetach  (void* arg1)				// a
+32 int      segfree    (void* arg1, ulong arg2)			// ai
+33 int      segflush   (void* arg1, ulong arg2)			// ai
+34 void*    rendezvous (void* arg1, void* arg2)			// aa
+35 int      unmount    (char* arg1, char* arg2)			// ss
+36 Waitmsg* wait       (void)					//
+37 int      semacquire (long* arg1, int arg2)			// ai
+38 long     semrelease (long* arg1, long arg2)			// ai
+39 vlong    seek       (int arg1, vlong arg2, int arg3)		// iii
+40 int      fversion   (int arg1, int arg2, char* arg3, int arg4)	// iisi
+41 int      errstr     (char* arg1, uint arg2)			// si
+42 int      stat       (char* arg1, uchar* arg2, int arg3)	// s?i
+43 int      fstat      (int arg1, uchar* arg2, int arg3)	// i?i
+44 int      wstat      (char* arg1, uchar* arg2, int arg3)	// s?i
+45 int      fwstat     (int arg1, uchar* arg2, int arg3)	// i?i
+46 int      mount      (int arg1, int arg2, char* arg3, int arg4, char* arg5)	// iisis
+47 int      await      (char* arg1, int arg2)			// si
+50 long     pread      (int arg1, void* arg2, long arg3, vlong arg4)	// iaii
+51 long     pwrite     (int arg1, void* arg2, long arg3, vlong arg4)	// iaii
+52 long     _d         (char *arg1, void *arg2)	               // sa
+

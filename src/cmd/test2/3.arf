@@ -1,0 +1,4 @@
+create:3.out,0666
+#write:Hello and Goody%c+10000
+write:+1000000
+close

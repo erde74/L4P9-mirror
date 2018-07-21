@@ -1,0 +1,4 @@
+"scsireq.c" and "scsireq.h" are copied from plan9-0711/sys/src/cmd/scuzz
+
+"usb.h" is are copied from plan9-0711/sys/src/cmd/lib
+

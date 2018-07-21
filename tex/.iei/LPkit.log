@@ -1,0 +1,247 @@
+This is pTeX, Version 3.141592-p3.1.10 (utf8.euc) (Web2C 7.5.4) (format=platex 2009.4.6)  14 JUL 2009 10:37
+**LPkit
+(./LPkit.tex
+pLaTeX2e <2006/11/10>+0 (based on LaTeX2e <2003/12/01> patch level 0)
+(./ieicej.cls
+Document Class: ieicej 2008/05/13 v1.5 for Transactions of IEICE
+\@JQ=\dimen118
+\@Q=\dimen119
+\@EM=\dimen120
+\c@@paper=\count81
+LaTeX Font Info:    External font `min9 at8.8711pt' loaded for size
+(Font)              <9> on input line 440.
+\@authorlist=\toks15
+\@authorcnt=\count82
+\@alcnt=\count83
+\p@alcnt=\count84
+\@totalnumber=\count85
+\authornamesep=\dimen121
+\@spcnt=\count86
+\alignorder=\count87
+\totalnumberm@ne=\count88
+\@authorcntp@ne=\count89
+\chk@alcnt=\count90
+\chk@p@alcnt=\count91
+\eabstractbox=\box41
+\ekeywordbox=\box42
+\Pauthorsep=\dimen122
+\abstractbox=\box43
+\keywordbox=\box44
+\Lauthorsep=\dimen123
+\LPauthorsep=\dimen124
+\c@section=\count92
+\c@subsection=\count93
+\c@subsubsection=\count94
+\c@paragraph=\count95
+\c@subparagraph=\count96
+\@hlskip=\skip41
+\verbatimleftmargin=\dimen125
+\verbatimbaselineskip=\dimen126
+\c@figure=\count97
+\c@table=\count98
+\abovecaptionskip=\skip42
+\belowcaptionskip=\skip43
+\@tempboxb=\box45
+\capwidth=\dimen127
+\ecapwidth=\dimen128
+\symmincho=\mathgroup4
+LaTeX Font Info:    Overwriting symbol font `mincho' in version `bold'
+(Font)                  JY1/mc/m/n --> JY1/gt/m/n on input line 2847.
+\bibindent=\dimen129
+\c@profile=\count99
+\mathindent=\dimen130
+\@minsofar=\count100
+\@min=\count101
+\@cite@temp=\count102
+) (/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/graphicx.sty
+Package: graphicx 1999/02/16 v1.0f Enhanced LaTeX Graphics (DPC,SPQR)
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 1999/03/16 v1.13 key=value parser (DPC)
+\KV@toks@=\toks16
+)
+(/usr/local/teTeX/share/texmf/tex/latex/graphics/dvipdfmx-contrib-latex/graphic
+s.sty
+Package: graphics 2001/07/07 v1.0n Standard LaTeX Graphics (DPC,SPQR)
+ (/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/trig.sty
+Package: trig 1999/03/16 v1.09 sin cos tan (DPC)
+)
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/graphics.cfg
+File: graphics.cfg 2005/02/03 v1.3 graphics configuration of teTeX/TeXLive
+)
+Package graphics Info: Driver file: dvips.def on input line 81.
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/graphics/dvips.def
+File: dvips.def 1999/02/16 v3.0i Driver-dependant file (DPC,SPQR)
+))
+\Gin@req@height=\dimen131
+\Gin@req@width=\dimen132
+)
+(./comment.sty) (./LPkit.aux)
+\openout1 = `LPkit.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for JY1/mc/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for JT1/mc/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    External font `min8 at8.1318pt' loaded for size
+(Font)              <8> on input line 29.
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <8> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 29.
+LaTeX Font Info:    External font `goth8 at8.1318pt' loaded for size
+(Font)              <8> on input line 29.
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <9> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 45.
+LaTeX Font Info:    External font `goth9 at8.8711pt' loaded for size
+(Font)              <9> on input line 45.
+LaTeX Font Info:    External font `min10 at13.307pt' loaded for size
+(Font)              <12> on input line 59.
+LaTeX Font Info:    External font `min10 at11.089pt' loaded for size
+(Font)              <10.95> on input line 59.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <10.95> on input line 59.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <8> on input line 59.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <6> on input line 59.
+LaTeX Font Info:    External font `min6 at6.6533pt' loaded for size
+(Font)              <6> on input line 59.
+LaTeX Font Info:    External font `min10 at9.6104pt' loaded for size
+(Font)              <10> on input line 59.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <7> on input line 59.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <5> on input line 59.
+LaTeX Font Info:    External font `min7 at7.3926pt' loaded for size
+(Font)              <7> on input line 59.
+LaTeX Font Info:    External font `min5 at5.1748pt' loaded for size
+(Font)              <5> on input line 59.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <9> on input line 59.
+LaTeX Font Info:    Font shape `JT1/mc/bx/n' in size <10.95> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 64.
+LaTeX Font Info:    External font `goth10 at11.089pt' loaded for size
+(Font)              <10.95> on input line 64.
+
+Overfull \hbox (4.21075pt too wide) in paragraph at lines 118--125
+\OT1/cmtt/m/n/9 read(), write(), clunk(), remove(), stat() \JY1/mc/m/n/9 等
+ []
+
+LaTeX Font Info:    External font `min10 at17.742pt' loaded for size
+(Font)              <17.28> on input line 136.
+LaTeX Font Info:    Try loading font information for OMS+cmr on input line 136.
+
+(/usr/local/teTeX/share/texmf-dist/tex/latex/base/omscmr.fd
+File: omscmr.fd 1999/05/25 v2.5h Standard LaTeX font definitions
+)
+LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <8> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 136.
+ [1
+
+
+]
+File: ../fig/LP49general.eps Graphic file (type eps)
+
+<../fig/LP49general.eps> [2]
+LaTeX Font Info:    External font `goth9 at8.8711pt' loaded for size
+(Font)              <9> on input line 272.
+LaTeX Font Info:    Font shape `JT1/gt/m/it' in size <9> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 272.
+LaTeX Font Info:    Font shape `JY1/gt/m/it' in size <9> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 272.
+LaTeX Font Info:    External font `goth9 at8.8711pt' loaded for size
+(Font)              <9> on input line 272.
+LaTeX Font Info:    Font shape `JT1/gt/m/it' in size <7> not available
+(Font)              Font shape `JT1/gt/m/n' tried instead on input line 272.
+LaTeX Font Info:    Font shape `JY1/gt/m/it' in size <7> not available
+(Font)              Font shape `JY1/gt/m/n' tried instead on input line 272.
+LaTeX Font Info:    External font `goth7 at7.3926pt' loaded for size
+(Font)              <7> on input line 272.
+File: ../fig/VirtualFileObject.eps Graphic file (type eps)
+ <../fig/VirtualFileObject.eps>
+Overfull \hbox (8.56728pt too wide) in paragraph at lines 310--311
+ [] 
+ []
+
+LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <9> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 319.
+[3]
+LaTeX Font Info:    Try loading font information for OMS+cmtt on input line 349
+.
+LaTeX Font Info:    No file OMScmtt.fd. on input line 349.
+
+
+LaTeX Font Warning: Font shape `OMS/cmtt/m/n' undefined
+(Font)              using `OMS/cmsy/m/n' instead
+(Font)              for symbol `textbraceleft' on input line 349.
+
+File: ../fig/LP49syscall.eps Graphic file (type eps)
+<../fig/LP49syscall.eps> [4]
+File: ../fig/RemoteAccess2.eps Graphic file (type eps)
+ <../fig/RemoteAccess2.eps>
+Overfull \hbox (8.56728pt too wide) in paragraph at lines 478--479
+ [] 
+ []
+
+[5]
+File: ../fig/NS-server-servant.eps Graphic file (type eps)
+ <../fig/NS-server-servant.eps>
+File: ../fig/NSmount.eps Graphic file (type eps)
+ <../fig/NSmount.eps> [6]
+Overfull \hbox (8.56891pt too wide) in paragraph at lines 721--759
+ [] 
+ []
+
+[7] [8]
+Overfull \hbox (25.11696pt too wide) in paragraph at lines 932--934
+[]\OT1/cmr/m/n/7 www.minix3.org.: \OT1/cmr/m/it/7 Minix Web site\JY1/mc/m/n/7 
+， \OT1/cmr/m/n/7 http://www.minix3.org/ 
+ []
+
+
+Overfull \hbox (14.37221pt too wide) in paragraph at lines 940--942
+[]\OT1/cmr/m/n/7 DROPS OS project : \OT1/cmr/m/it/7 L4Linux Web site\JY1/mc/m/n
+/7 ， \OT1/cmr/m/n/7 http://os.inf.tu-
+ []
+
+
+Overfull \hbox (24.4565pt too wide) in paragraph at lines 944--946
+[]\OT1/cmr/m/n/7 http://www.gnu.org/software/hurd/history/port[]to[]l4.html 
+ []
+
+
+Overfull \hbox (26.14656pt too wide) in paragraph at lines 949--951
+[]$\OML/cmm/m/it/7 H[]O$ \JY1/mc/m/n/7 ：  \OT1/cmr/m/it/7 LP49 Web site\JY1/mc
+/m/n/7 ， \OT1/cmr/m/n/7 http://research.nii.ac.jp/H2O/LP49/ 
+ []
+
+[9] [10
+
+
+] (./LPkit.aux)
+
+LaTeX Font Warning: Some font shapes were not available, defaults substituted.
+
+ ) 
+Here is how much of TeX's memory you used:
+ 982 strings out of 95542
+ 11795 string characters out of 1190447
+ 71230 words of memory out of 1500000
+ 4155 multiletter control sequences out of 10000+50000
+ 20447 words of font info for 79 fonts, out of 1200000 for 2000
+ 14 hyphenation exceptions out of 8191
+ 27i,12n,24p,347b,460s stack positions out of 5000i,500n,6000p,200000b,5000s
+
+Output written on LPkit.dvi (10 pages, 63048 bytes).

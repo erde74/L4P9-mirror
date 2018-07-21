@@ -1,0 +1,341 @@
+<><><><><><><><> Command usage examples <><><><><><><><><>
+
+==========================================================
+#     Debug commands                                     #
+==========================================================
+
+--> More detailed information; refer to "DBG-CMND" file in this directory.
+
+LP49[/]: d  up           ---- Dump the current process PCB
+LP49[/]: d  ns           ---- Dump the name space of current process
+LP49[/]: d  <tablename> <address>
+.....
+
+
+==========================================================
+#           ls, pwd, cd                                  #
+==========================================================
+LP49[/]: ls   		
+
+LP49[/]: cd work	
+LP49[/work]: ls		
+LP49[/work]: pwd		
+LP49[/work]: cd		
+LP49[/]: ls		
+
+====== put, putsl, get =======
+LP49[/]: put  <any_string>
+LP49[/]: get
+LP49[/]: putsl
+LP49[/]: get
+LP49[/]: put $sl
+LP49[/]: get
+
+
+==========================================================
+#           device servers                               #
+==========================================================
+<> Device servers have name #<char>
+   #f    floppy device
+   #l    (el) ether device
+   #I    (ai) Internet protocol stack
+   #S    Storage device	
+   #e    environment variable 
+   #|    pipe device
+   ......
+
+
+======== Pipe device ========
+
+LP49[/]: cd work 				 
+LP49[/work]: pipe		-> 0,1  	 
+LP49[/work]: write 1 aaaaa			 
+LP49[/work]: write 1 777777777		 
+LP49[/work]: read 0				 
+LP49[/work]: read 0				 
+
+
+======== Ether card ========
+
+<> "#l" (el) is an ether driver.
+
+LP49[/]: ls #l
+LP49[/]: bind 0 #l dev			 
+LP49[/]: ls dev 				 
+	==> d r-xr-xr-x 0 /dev
+	    This directory contains...
+	    d r-xr-xr-x 0 ether0/  ...
+
+
+==== Environment(devenv.c)  ============
+
+<> "#e" environment 
+
+LP49[/]: bind -c #e env				 
+LP49[/]: ls env					 
+	==> d r-xr-xr-x    0  env/  Tdq<e 0 0> ..
+	    This directory contains ...
+	
+LP49[/]: cd env					 
+LP49[/env]: ls 					 
+	==> d r-xr-xr-x    0  env/  Tdq<e 0 0> ..
+
+LP49[/env]: putenv AA aaaa			
+LP49[/env]: putenv BB bbbbb
+LP49[/env]: ls
+	==> d r-xr-xr-x    0   env/  Tdq<e 0 0> ...
+	    This directory contains ...
+	    - rw-rw-rw-    4   AA    Tdq<e 0 1> ...
+	    - rw-rw-rw-    5   BB    Tdq<e 0 1> ...
+
+LP49[/env]: getenv AA				NG
+
+
+
+======= Dup (devdup.c) test =======
+
+<>  "#d"    dup
+
+LP49[/]: bind  #d /fd			 
+LP49[/]: cd fd				 
+LP49[/fd]: ls				 
+	d r-xr-xr-x    0  fd/    Tdq<d 0 0> ...
+	This directory contaims ...
+	- r--------    0  0       Tdq<d 0 1>
+	- r--------    0  0Ctl    Tdq<d 0 2>
+
+
+====== Devsrv test  ======
+
+<>  "#s" is a database where servaers are registerd.
+
+LP49[/]: bind  #s /srv			 
+LP49[/]: cd srv				 
+LP49[/srv]: ls				 
+
+
+
+====== Storage device (devsd.c sdatat.c)  ======
+
+<> "#S": devsd.c
+<>  "#SsdC0" 
+
+
+LP49[/]: bind -a  #SsdC0   /dev		 
+LP49[/]: cd dev				 
+LP49[/dev]: ls				 
+	- rw-rw-rw-      0  ctl   Tdq<S ,,,>
+	x rw-------      0  raw   Tdq<S ,,,>
+	- rw-r-----  1073741824    data   Tdq<S ,,,>
+	- rw-r-----  479744   dos     Tdq<S ,,,>
+	- rw-r-----  511488   plan9   Tdq<S ,,,>
+
+LP49[/dev]: open -r ctl     
+
+LP49[/dev]: read 0
+	inquiry VMware Virtual IDE Hard Drive
+	config ....
+	geometry ....
+	part data 0 2097152 
+	part dos  63 1000
+	part plan9 1001 2000
+
+LP49[/dev]: open -r dos  -> 1
+LP49[/dev]: read 1 
+
+
+=============== devramfs ==================
+
+<> "#R" is a toy ram file system with the Dev interface.
+
+LP49[/]: ls #R			
+  ->	d rwxrwxrwx    0  #R/    Tdq<R 0 0>  	
+	This diretory contains...
+	- rwxrwxrwx  128  Alpha  Tdq<R 0 1>  	
+	- rwxrwxrwx  128  Beta  Tdq<R 0 1>  	
+	- rwxrwxrwx  128  Gamma  Tdq<R 0 1>  	
+	- rwxrwxrwx  128  Delta  Tdq<R 0 1>  	
+
+	.... Now in trouble ...
+
+LP49[/]: open -w #R/Alpha  	
+	--> returns <fd> 
+LP49[/]: write 0 aaaaa		<fd> == 0 is assumed.
+LP49[/]: write 0 bbbbbbb		
+LP49[/]: read 0			
+
+
+
+==========================================================
+#             bind command                               #
+==========================================================
+
+<> bind command is used to bind the device server onto the name space. 
+
++ option 0: Replace 
+	 1: before (-b)
+	 2: after  (-a)
+	 4: create (-c)
+
+
+---- bind 0 #R  (replace)------------
+
+LP49[/]: bind 0 #R /work		 
+LP49[/]: ls work 			 
+
+LP49[/]: open -r /work/Alpha   -> 0 	 
+LP49[/]: read 0			 
+
+LP49[/]: open -w /work/Beta   -> 1	 
+LP49[/]: write 1 aaaaa		 
+LP49[/]: write 1 ------		 
+LP49[/]: read 1			 
+
+
+---- bind -a #R  (after)------------
+
+LP49[/]: bind -a #R work		 
+LP49[/]: ls work 			 
+
+LP49[/]: open -r work/Alpha   -> 0 	 
+LP49[/]: read 0			 
+
+LP49[/]: open -w work/Beta  -> 1	 
+LP49[/]: write 1 aaaaa		 
+LP49[/]: write 1 ------		 
+LP49[/]: read 1			 
+
+
+---- bind -b #R  (before)------------
+
+LP49[/]: bind -bc #R work		  
+LP49[/]: ls work 			  
+LP49[/]: d ns
+
+LP49[/]: open work/Alpha 0  -> 0 	 ?   --> Patch: devroot.c 
+
+---- bind -c #R  (Creatable) ------------
+
+
+
+
+==========================================================
+#             mount command                              #
+==========================================================
+
+<> DOS FILE SERVER 
+
+LP49[/]:  bind -a #s  /srv
+
+LP49[/]:  bind -a #f  /dev
+	==> Floppy /dev/fd0disk 
+
+LP49[/]:  dossrv
+	==> DOS-file-server is registered in /srv as /srv/dos.
+
+LP49[/]:  mount -a  /srv/dos  /tmp  /dev/fd0disk
+	==> DOS-file-server is mounted at /tmp directory.
+	
+LP49[/]:  ls /tmp
+
+
+
+==========================================================
+#             Process creation                           #
+==========================================================
+
+=======  spawn() ================
+
+LP49[/]:  bind -a #s  /srv
+	==> 
+
+LP49[/]:  bind -a #f  /dev
+        ==> Floppy /dev/fd0disk  
+
+LP49[/]:  dossrv
+        ==> DOS-file-server is registered in /srv as /srv/dos.
+
+LP49[/]:  mount bind -a #s  /srv  /dev/fd0disk
+        ==> DOS-file-server is mounted at /tmp directory.
+
+LP49[/]:  ls  /tmp
+	/tmp directory contains programs ex1, ex2, ramfs, etc. are 
+
+LP49[/]:  spawn  /tmp/ex2 10
+
+
+===========================================
+<> spawn RAMFS server 
+
+LP49[/]:  bind -a #s  /srv     
+	==> 
+
+LP49[/]:  bind -a #f  /dev
+	==> 
+
+LP49[/]:  dossrv
+
+LP49[/]:  mount -a  /srv/dos  /tmp  /dev/fd0disk
+
+LP49[/]:  ls /tmp
+
+LP49[/]:  spawn  /tmp/ramfs -D -S ramfs
+
+LP49[/]:  mount -ca /srv/ramfs  /work  ""
+
+LP49[/]:  cd  work
+LP49[/work]: open -w Alpha   --> 0
+LP49[/work]: write 0 $sl
+LP49[/work]: close 0
+LP49[/work]: 
+LP49[/work]: cat Alpha
+LP49[/work]: 
+
+
+===== fork(), exec() =======
+<>  Not-yet-implemented 
+
+LP49[/work]: fork
+ 
+
+
+==========================================================
+#             Network                                    #
+==========================================================
+
+LP49[/]; bind -a #l /net
+	==> Ether device on /、/net/ethe
+ 
+LP49[/];  bind -a #I0 /net
+	==> Internet Protocol Stack 
+	    /、/net/tcp, /net/udp, /net/ipifc, /net/icmp,
+	    /net/arp, /net/iproute,,,, 
+ 
+LP49[/];  open -w /net/ipifc/clone
+         -- returns --> fd:0
+       ==>  、 /net/ipifc
+ 
+LP49[/];  write 0 bind ether /net/ether
+       ==>  "bind ether /net/ether" 
+
+LP49[/];  write 0 add 192.168.74.100 255:255:255:0
+       ==>  <スの IP-ad>   <ssと subnet>
+
+
+              [RemoteHost]: ping 192.168.74.100
+ 
+
+LP49[/];  open -w /net/tcp/clone
+   	-- returns -->  fd:1
+
+ 
+LP49[/];  write 1 announce 80
+	==> TCP connection  (Ex. /net/tcp/0 
+
+
+              [RemoteHost]: telnet 192.168.74.100 80
+
+			
+LP49[/];  cat /net/tcp/1/data
+
+

@@ -1,0 +1,6 @@
+# read file
+bind:#f,/dev
+mount:/tmp,/dos/srv,/dev/fd0disk
+open:in,OREAD
+readn:100
+close

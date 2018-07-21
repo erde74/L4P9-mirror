@@ -1,0 +1,35 @@
+
+<<< GCC function linkage convention >>>
+
+
+      lower address
+
+	|---------------|
+	|		|
+	|---------------|
+	|		|
+	|---------------| <--- ESP
+	|  local var	|
+	|---------------|
+	|  local var	|
+	|---------------|
+	|  local var	|
+	|---------------| <-- EBP
+	|  saved EBP	|
+	|---------------|
+	|  rtrn Address	|
+	|---------------|
+	|   arg[0]	|
+	|---------------|
+	|   arg[1]	|
+	|---------------|
+	|		|
+     Higher address
+
+
+
+<<< Function epilogue >>>
+
+	pop   ebp
+	ret
+

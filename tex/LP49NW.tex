@@ -1,0 +1,1231 @@
+\documentstyle[11pt]{jreport}
+% \documentstyle[11pt]{jarticle}
+% \documentstyle[twocolumn]{jarticle}
+\input epsf
+\input comment.sty
+
+\topmargin = 0cm
+\oddsidemargin = 0cm
+\evensidemargin = 0cm
+\textheight = 24cm
+\textwidth = 17cm
+
+\setcounter{secnumdepth}{2}
+
+%-----------------------------
+\begin{document}
+
+\title{\huge\bf
+LP49 ネットワークプログラムの説明
+}
+
+\author{$H_2O$}
+
+% \eauthor{
+%  Katsumi Maruyama, Yoshihide Sato 
+% }
+
+% \affiliation{国立情報学研究所   National Institute of Informatics}
+
+\maketitle
+
+\tableofcontents
+
+\chapter{LP49のNWプログラムの基本}
+   
+\section{はじめに}
+
+      NW (network)機能は OS の最重要機能の一つであり、OS技術者、OS研究者は
+      そのプログラム構造とロジックを完全にマスターしておくことが望まれる。
+      しかしながら、NW機能は複雑なだけに、NW関連プログラム (プロトコルスタックや  
+      Erherドライバなど)は大変に複雑で難解である。
+      学習用 OS として有名な Minix も、NW関連プログラムは複雑であり、
+      Tanenbaumの Minix教科書 "Operating System" も NW関連プログラムの解説は載っていない。
+      Unixや Linux のNW関連プログラムは、効率を上げるために益々複雑化しており、
+      簡単に学習できるものではない。
+    
+      しかるに、Plan9のPlan9 のNWプログラムは 3回にわたる作り直しを経ているだけに、
+      構造が整理されており、比較的学習もしやすい。
+      そこで、LP49 は Plan9 の NW関連プログラム構造を引き継ぐこととした。
+
+
+\section{Plan9/LP49のNWプログラムの特徴}
+
+  (1) Plan9 のNWプログラムは 3回にわたる作り直し 
+      (UNIX sytem5の straem方式 → マルチスレッドx-kernel形式 → 現在の方式)
+      を経ており、構造が整理されている。
+      プログラムは、定期的に作り直しをするべきである。
+
+    (2) xkernel など優れた研究成果を取り入れており、学習用としても適切である。
+
+    (3) Etherドライバは Ether card 対応に用意する必要があるが、 
+      Plan9 用に開発されたEtherドライバを少ない修正で流用できるので、
+      Ether ドライバの開発工数を節約できる。
+
+    (4) 各プログラムは、プロトコル対応のモジュール化、共通インタフェース化など。
+      ソフトウェアの部品化の観点からも、よく整理されている。
+
+
+\chapter{IPプロトコルスタックとソフトウェア部品化}
+
+\section{IPサービス}
+
+{\bf \flushleft(1) 部品化}
+
+NW処理プログラムは、下図に示すように
+\begin{itemize}
+\item  NWサービスのアクセス法を提供する``IPサーバント''
+\item  TCP, UDP, IP 等に対応した、各プロトコル処理プログラム
+\end{itemize}
+として、うまく部品化がなされている。
+
+{\small
+\begin{verbatim}
+【IPサービスを担当するプログラム】
+       +---------+     
+       | devip.c |     <--- IPサーバント
+       |         |     
+       +---------+     
+                                          
+       +---------+  +-------+  +-------+  +-------+  +-------+  +-------+ 
+       |ipifc.c  |  | tcp.c |  | udp.c |  | ip.c  |  |icmp.c |  | arp.c | <-- プロトコル処理
+       |         |  |       |  |       |  |       |  |       |  |       | 　　プログラム
+       +---------+  +-------+  +-------+  +-------+  +-------+  +-------+ 
+\end{verbatim}
+}
+
+
+{\bf \flushleft(2) IPサーバント}
+
+\begin{itemize}
+\item  IPサービスは、``IPサーバント''を介して提供される。
+       つまり、LP49-CORE内でNW関連のシステムコールは 
+       IPサーバントを呼び出すことになる。
+
+\item  IPサーバントは "\#I"(大文字の'i') という名前を持ち、
+       名前空間の``\verb|/net|''にマウントされる。
+       従って、IPサービスは、``\verb|/net|''以下の名前空間のファイルを
+       open(), read(), write(),,,   することで行われる。
+       例えば、TCP接続は \verb|/net/tcp/clone|ファイルをopen() する
+       ことで行われる。
+
+\item  IPサーバントのソースプログラムは、 ``src/9/ip/devip.c'' として部品化されている。
+
+\item    複雑なプロトコル処理を比較的簡明なプログラムで実現しており、
+    プロトコル処理の教科書としても効果的。
+\end{itemize}
+
+
+{\bf \flushleft(2) 各層のプロトコル処理プログラム}
+
+\begin{itemize}
+\item  プロトコル処理プログラムは、各プロトコル(TCP, UDP, IP, ICMP, ARP 等）対応に
+       プログラム部品化されている。
+
+\item  NWインタフェース構成(ローカルアドレス、マスク、MTUサイズ等）を規定する
+       プログラム (ipifc.c) もプロトコル処理プログラムとして統一されている。
+
+\item  プロトコル処理プログラムは、統一インタフェースを持つ。
+
+\item  プロトコル処理プログラムのソースは、 src/9/ip/\{ipifc.c, tcp.c, udp.c,,,,\} 
+       である。
+
+\item  各プロトコル処理プログラムは有限状態マシンとして実装されており、
+       比較的容易に内容を理解することができる
+       (といってもTCPは機能が複雑なので、プログラムも相応に複雑)。
+
+\end{itemize}
+    
+
+\section{Etherサービス}
+
+{\bf \flushleft(1) 部品化}
+
+Etherドライバ関連のプログラムは、下図のように
+\begin{itemize}
+\item   Etherデバイスのサービスを提供する``Etherサーバント''
+\item   非同期に到着するパケットを読み出す役目の``ethermedium''
+\item   各Etherデバイスに対応したデバイスドライバ
+\end{itemize}
+に部品化されている。
+
+{\small
+\begin{verbatim}  
+    【Etherデバイス関連プログラム】
+       +----------+    +-----------+    +----------+    +----------+    +----------+ 
+       |devether.c|    | ethermediu|    |etherxxx.c|    |etherxxx.c|    |etherxxx.c| 
+       |          |    | m.c       |    |driver    |    |driver    |    |driver    | 
+       +----------+    +-----------+    +----------+    +----------+    +----------+ 
+\end{verbatim}
+}
+    
+
+{\bf \flushleft(2) Etherサーバント}
+
+\begin{itemize}
+\item    Etherドライバのサービスは、Etherサーバントを介して行われる。
+         Etherサーバントは、 "\#l"(小文字の'L') という名前を持ち、
+         名前空間の``\verb|/net|'' にマウントされる。 
+
+\item   Etherサーバントのソースプログラムは、src/9/pc/devether.c である。
+
+\end{itemize}
+
+
+
+{\bf \flushleft(3) Etherドライバプログラム}
+
+ 各Etherドライバプログラムは、src/9/pc/\{ether79c970.c, ether8139.c ,,,\}として、
+部品化されている。
+
+
+
+\chapter{IPサーバント (\#I)}
+
+\section{IPサーバントが提供する名前空間}
+
+   IPサーバントは \verb|/net| にマウントされて、以下の名前空間とIPサービスを提供する。
+
+{\small
+\begin{verbatim}
+       --- net/ -+-- ipifc/ --+---- clone                       
+                 |            |--- stats                 
+                 |            |---  0/ -+-- status         
+                 |            :         |-- ctl          
+                 |
+                 |-- arp                                 
+                 |-- log                                 
+                 |-- ndb                                 
+                 |-- iproute                             
+                 |-- ipselftab                           
+                 |                                      
+                 |-- icmp/ ----                           
+                 |-- udp/ --+--- clone                    
+                 |          |--- status     
+                 |          |---  0/ --+-- data           
+                 |          |          |-- ctl          
+                 |          :          |-- local        
+                 | 
+                 |-- tcp/ --+--- clone                    
+                 :          |--- stats                 
+                            |---  0/ --+-- data           
+                            |          |-- ctl          
+                            |          |-- local        
+                            |          |-- remote       
+                            |          |-- status       
+                            |          |-- listen
+                            |
+                            |--- 1/ ---+-- data
+                            :          :
+\end{verbatim}
+}
+
+
+この名前空間の主要な要素を、以下に説明する。
+
+
+{\bf \flushleft(1) ipifc}
+
+  IPインタフェースを管理している。
+  /net/ipifc/clone ファイルをオープンすると、/net/ipifc/N (ここに N は、0, 1, 2,,,) 
+  が生成され、/net/ipifc/N/ctl ファイルの記述子が返される。
+  /net/ipifc/N/ctl ファイルには、以下のコマンドを書き込むことによって、
+  インタフェース属性が設定される。
+\begin{verbatim}
+   bind  ether  <path>
+   bind  loopbak
+   add  <localaddress> <mask> <remoteaddress> <mtu>   - - 引数はoption
+   mtu  <n>
+   bridge
+   promiscuous.
+   ....
+\end{verbatim}
+
+{\bf \flushleft(2) iproute}
+
+   IPルーティング情報を管理している。
+
+{\bf \flushleft(3) ipselftab}
+
+   ローカルアドレスの一覧。
+
+{\bf \flushleft(4) log}
+
+   ログデータが記録される。
+
+{\bf \flushleft(5) ndb}
+
+  ネットワーク情報のデータベース。
+
+{\bf \flushleft(6) arp}
+
+   アドレス解決。
+
+{\bf \flushleft(7) icmp}
+  
+    Internet Control Message Protocol。
+    Ping は、本サービスの一つ。
+
+{\bf \flushleft(8) ip}
+
+    IP。　
+
+{\bf \flushleft(9) ipmux}
+
+   IPパケットフィルター。
+
+{\bf \flushleft(10) udp}
+
+    UDP。
+
+{\bf \flushleft(11) tcp}
+
+    TCP。
+
+
+
+\section{各プロトコルに共通したdirectoryと操作}
+
+各プロトコル(TCP, UDP, ICMP, IP等)は、以下の共通性質を持つ。
+
+\begin{enumerate}
+\item  各プロトコルのトップdirectoryは、``clone''ファイル, ``stat''ファイル
+  並びに 0, 1, 2,,, と番号名のついた directory を有する。
+  番号名 directoryは、そのプロトコルの``論理チャンネル'' に対応する。
+
+\item  ``clone''ファイルをopen()すると、``論理チャンネル''が予約され, 
+  番号名 directory が割り当てられ, 
+  その下の``ctlファイル''の記述子が返される。\\
+  この論理チャンネルは、リモートマシンに接続要求するとき、
+  あるいリモートマシンからの接続要求を受けるために使われる。
+
+\item  番号名 directoryは、``ctl''ファイル、``data''ファイル 他を含む。
+      ``ctl''ファイルは制御に、``data''ファイルはデータの送受信に使われる。
+
+\item  リモートマシンに接続要求するときは、``ctl''ファイルに
+    {\tt connect}コマンドを書き込む。\\
+     \verb|  connect  IPアドレス!ポート  | 
+
+\item  リモートマシンからの接続要求受けを宣言するには、
+        ``ctl''ファイルに{\tt announce}コマンドを書き込む。\\
+     \verb|  announce  ポートまたは＊  | 
+    
+\item  リモートマシンからの接続要求を受け付けるには、
+  ``listen''ファイルを{\tt open()}して待つ。
+
+\end{enumerate}
+
+
+
+\section{(参考) qshシェルからのプロトコルスタックの直接制御の例}
+
+\begin{verbatim}
+      LP49[/]: bind -a #l  /net  
+           →  #l(エル)はether cardである。/net/ether0 が見えるようになる。
+      LP49[/]: bind -a #I0  /net           
+           →  #I0(アイゼロ)はプロトコルデバイスである。
+             これにより、/net/ipifc,arp.tcp,udp,,,, が見えるようになる。
+      LP49[/]: open -w /net/ipifc/clone    
+           →  /net/ipifc/clone を writable (-w) でオープンする。
+             インタフェースが生成され (/net/ipifc/0)、そのfd が返る。ここでは fd=5 とする。
+      LP49[/]: write 5 bind  ether  /net/ether0  
+           →  上記で生成されたファイルに "bind  ether  /net/ether0"命令を書き込む。
+              これにより、Etherカードがバインドされる。
+      LP49[/]: write 5 add 192.168.74.100 255:255:255:0  
+           →  "add IPアドレス サブネットマスク"命令を書き込む。
+              アドレスとサブネットマスクが設定される。
+            --- 他のマシンから ping 192.168.74.100 を送ると 応答する ----
+      LP49[/]: open -w /net/tcp/clone      
+           →  fd が返る。ここでは 1 とする。
+      LP49[/]: write 1 announce 80
+           --- 他のマシンから telnet 192.168.74.100  80 を受け付けている-----
+\end{verbatim}
+
+
+{\bf\flushleft (参考) サーバント dev.c   devxxx.c}
+
+      サーバントのソースプログラムは ``devxxx.c'' というファイル名をもっている。
+      なお ``dev.c'' は共通に使われる関数を定義している。
+
+      下図に示すように、サーバントのソースプログラム {\tt devxxx.c} は、
+      {\tt xxxopen( ), xxxcreate( ), xxxwrite( ), xxxread( )} 等サーバントのサービスを
+      提供するの関数と、これらの関数へのリンクテーブル (Devテーブル）を含んでいる。
+      外部からは、 Dev テーブル経由でアクセスされる。
+      サーバントは、適切に設計されたソフトウェアコンポーネントである。
+
+{\small
+\begin{verbatim}    
+       +---------------------------------------------------------------------------------+ 
+       | +-- Dev ------+  +-----------+       +-----------+  +-----------+               | 
+       | |  type       |  |   init    |       |  open     |  |   read    |               |
+       | |  name       |  |   func    |       |  func     |  |   runc    |               |
+       | |  (*init)()  |  |           |       |           |  |           |               |
+       | |     :       |  |           | ....  |           |  |           | ......        |
+       | |  (*open)()  |  | (static)  |       | (static)  |  | (static)  |               |
+       | |  (*read)()  |  |           |       |           |  |           |               |
+       | |  (*write)() |  |           |       |           |  |           |               |
+       | |    ：       |  |           |       |           |  |           |               |
+       | +-------------+  +-----------+       +-----------+  +-----------+               | 
+       +---------------------------------------------------------------------------------+ 
+
+\end{verbatim}
+}    
+
+
+
+\chapter{ Etherサービス}
+
+\section{Etherサーバント (\#l)}
+
+    Etherデバイスのサービスは、Etherサーバントを介して提供される。
+    Etherサーバントの名前は``\#l'' (小文字の'L' ）であり、
+   名前空間の``/net''にマウントして使われる。
+   ソースプログラムは、 {\tt src/9/cp/devether.c} である。
+
+\begin{verbatim}   
+  【Etherサーバントの名前空間】
+     --- net/ -+-- ether0/ ----+---- clone                    
+               |               |--  0/  ----+--- data        
+               |               :            |--- ctl       
+               |               :            |--- ifstats   
+                                            |--- stats     
+                                            |--- type      
+                                                            
+\end{verbatim}    
+    
+
+\section{Ethermediaプログラム}
+
+\vspace{4cm}
+
+\section{Etherドライバプログラム}
+
+{\bf \flushleft(1) Etherドライバ \#I}
+
+\vspace{4cm}
+
+
+
+%%%%%%%%%%
+\chapter{プロトコル処理の流れ}
+
+\section{ 送信時のデータと処理の流れ}
+
+      応用プログラムがデータを送信するには, 
+      ``{\tt net/プロトコル/番号/data}''ファイルに{\tt write()}する。 
+      {\tt net/プロトコル/番号/data}ファイルは、IPサーバント( "\#I", 
+      {\tt devip.c}) が提供している。
+
+      以下、UDP送信の場合を 図 \ref{fig:txmit}  ``送信時の処理とデータの流れ'' 
+      にそって説明する。
+
+      なお、以下の説明で"データを引き継ぐ"と書いてある部分は、データのコピーではなく、
+      データブロックのポインタを引き継ぐことを意味する。
+      待ち行列については、後の節で詳しく説明する。
+
+\begin{enumerate}
+\item   NW接続に対する {\tt write()}システムコールは、
+        LP49-COREの中で IPサーバント( "\#I" サーバント {\tt devip.c}) の
+        \verb|ipwrite()| 呼び出しに変換される。
+
+        devip.cの \verb|ipwrite()|は、所定の処理を行った上で、
+        \verb|qwrite(c->wq, a, n)| を行って、UDP層にデータを引き継ぐ。
+       ここで, \verb|c->wq| は本仮想UDP接続の書き出し行列を、
+       \verb|qwrite()| は待ち行列への書き込み関数である。
+       この様に一見待ち行列を経由してUDP層にデータを引き継いでいるように見えるが、
+       実はこの\verb|c->wq| は他の場所で 
+       \verb|qbypass(udpkick,,)| として初期設定されているので、
+       待ち行列による遅延は起こらずに、
+       直ちにUDP層の \verb|udpkick()| が呼ばれる。
+
+\item  {\tt udp.c}の\verb|udpkick()| は、
+       {\tt ip.c}の \verb|ipoput4( )|を呼び出してデータを引き継ぐ。
+       関数名 {\tt ipoput4()} は IP層の outputで, IP-v4 であることを意味する。
+
+\item  {\tt ip.c}の \verb|ipoput4()| は、Etherサービスに処理を引き継ぐために、
+        {\tt ethermedium.c} の \verb|etherbwrite()| を呼ぶ。
+
+\item  \verb|etherbwrite()| は、Etherサーバント {\tt devether.c} の
+        \verb|etherbwrite( )| を呼ぶ。
+
+\item    \verb|etherbwrite( )| は、\verb|etheroq()| を呼ぶ。
+
+\item    \verb|etheroq( )| は、データを待ち行列に挿入(\verb|qbwrite(ether->oq)|)する。
+        ここで待ち行列を使っている理由は、Etherカードがビジーでただちにはパケットを
+        創出できない場合に備えるためである。
+
+\item    次いで 該当Etherドライバの \verb|transmit( )|を呼ぶ。
+
+\item    Etherドライバの \verb|transmit( )|は、\verb|txstart()| を呼ぶ。
+
+\item    \verb|txstart( )|は、Etherカードがビジーだったら{\tt return}する。
+         送るべきパケットは待ち行列に入っている。
+         Etherカードが空きだったら、待ち行列からデータを取り出す。
+
+\item   Ether Card にデータを書き込む。これにより、パケットが送信される。
+
+\item   Ether Card は送信を完了すると割込みを生じる。
+        \verb|txstart()| を呼んで, (待ち行列に)次の送信パケットがあれば処理させる。
+
+\end{enumerate}
+
+ このようにUDPの場合の送信は、
+Etherカードが空きならば LP49-COREの中では待ち合わせることなく
+パケットが創出される。
+Etherカードがビジーだった場合には、前のパケットが送り終わったときに割り込みが
+生じて処理される。
+
+TCPの場合は、フロー制御などが入るのでもっと複雑である。
+
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/txmit.eps}
+    \caption{送信時のデータと処理の流れ}
+    \label{fig:txmit}
+  \end{center}
+\end{figure}
+
+
+
+
+%%%
+\section{ 受信時のデータと処理の流れ}
+
+  IPサーバント（"\#I", devip.c) が提供している``{\tt net/プロトコル/番号/data}''ファイルを
+  \verb|read( )|することにより、応用プログラムはデータを受信する。
+
+  パケットの到着は、応用プログラムの\verb|read()|とは非同期に生じるので、
+  この対処が受信処理の興味が沸くところである。
+  本システムでの受信処理の基本は、以下のとおりである。
+
+\begin{itemize}
+\item  ``パケット受信スレッド''を用意しておく。
+      具体的には、Etherドライバの接続時に、
+      {\tt ethermedium.c} の \verb|etherbind( )|を呼んで、
+      パケット受信スレッド``{\tt etherread4}''を生成する。
+      このスレッドは、関数\verb|etherread4( )| を 実行する。
+
+\item  パケットが到着すると、Etherドライバの割り込みハンドラを起動して
+       ``パケット待ち行列''に挿入する。
+
+\item  パケット受信スレッドの\verb|etherread4( )| は、
+       パケット待ち行列にパケットが入るのを待つ。
+      このスレッドは、待ち行列にパケットが入ったら、
+      このスレッドを使ってIP層、UDP層等のプロトコル処理を行う。
+
+\item  プロトコル処理から応用プロセスへの引き継ぎには、待ち行列を用いる。
+\end{itemize}
+
+
+
+
+      以下、UDP受信の場合を 図 \ref{fig:ip-recv}  
+      ``受信時の処理とデータの流れ'' にそって説明する。
+
+\begin{enumerate}
+
+\item   パケットが到着すると Ether Cardは割込みを発生する。
+      L4マイクロカーネルは、割り込みをメッセージを割り込みハンドラスレッドに送る。
+     割り込みハンドラスレッドは、
+      該当Etherドライバの \verb|interrupt()|ルーチンを呼ぶ。
+
+\item    \verb|interrupt( )| は、同一モジュール内の\verb|receive( )|を呼ぶ。
+
+\item   \verb|receive( )|は、devether.c の \verb|etheriq( )| を呼ぶ。
+
+\item   \verb|etheriq( )| は、受信パケット待ち行列( \verb|netfile->in| ) に挿入する。
+       ここまでが割込み対処。 (なぜ割込み処理と呼ばなかったか)
+
+\item     {\tt devether.c} の \verb|etherbread( )|は、
+          ethermedium.c の パケット受信スレッド 
+         (このスレッドは \verb|etherread4()| を実行している)の下で、
+          待ち行列 ( \verb|netfile->in| ) にデータがくるのを待っている。
+
+\item    データが到着すると、 {\tt ethermedium.c} の\verb|etherread4( )| 
+    (つまり、パケット受信スレッド)
+    にデータが引き継がれる。
+
+\item   \verb|etherread4( )|は、ip.cの \verb|ipiput4( )|を呼び出しデータを引き継ぐ。
+
+\item   \verb|ipuput4( )|は該当プロトコル (UDP, TCP,,,; ここでは UDP) 
+  の \verb|udpiput( )|を呼ぶ。
+
+\item    \verb|udpiput( )| は、\verb|qpass( )|を使ってデータを
+  待ち行列 (\verb|c->rq| ) に入れる。
+
+\item   devip.cの \verb|ipread( )| は、データを待ち行列から取り出したら応用プロセスに返す。
+
+\end{enumerate}
+
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/ip-recv.eps}
+    \caption{受信時のデータと処理の流れ}
+    \label{fig:ip-recv}
+  \end{center}
+\end{figure}
+
+
+
+
+
+
+%%%%
+\chapter{プロトコルスタックの構造}
+
+\section{基本動作の仕組み}
+{\bf \flushleft(1) スタック間のコピーレスデータ引き継ぎ}
+
+    プロトコルスタック間のデータ引き継ぎをコピーレスにすることは、
+プロトコル処理プログラムの効率化の第一の工夫である。
+Unix BSD の mbuf構造体、Linux の skbuf構造体などがその例である。
+
+Plan9/LP49では、この目的で {\tt Block}構造体と{\tt Queue}構造体を使っている。
+{\tt Bloc}k構造体は、データが入っているバッファー域を管理する記述子であり、
+これを引き継ぐことでコピーレス転送を実現している。
+
+
+{\small
+\begin{verbatim}
+
+  struct Block //in portdat.h
+  {
+        Block*  next;     // 待ち行列のリンク
+        Block*  list;
+        uchar*  rp;       // バッファー域の読み出し点
+        uchar*  wp;       // バッファー域の書き込み点
+        uchar*  lim;      // バッファー域の終わり＋１
+        uchar*  base;     // バッファー域へのポインタ
+        void    (*free)(Block*);
+        ushort  flag;
+        ushort  checksum; 
+  };
+
+\end{verbatim}
+}
+
+
+
+{\bf \flushleft(2) 待ち行列 (Queue構造体とqio.cプログラム)}
+
+   {\tt src/9/port/qio.c} のプログラムと {\tt Queue}構造体 は待ち行列である。
+{\tt qio.c} では各種関数が用意されている。
+Queue構造体は待ち行列の実体であり、例えば
+``{\tt qbwrite(Queue*, Block*)}'' により{\tt Queue}に{\tt Block}が挿入され、
+``{\tt Block* qbread(Queue*, int)}'' により、{\tt Block}が取り出される。
+
+また、待ち行列ではあるが設定により実際には待ち合わせを行わないことも可能である。
+
+{\tt Queue}構造体の定義を以下に示す。
+
+{\small
+\begin{verbatim}
+
+  struct Queue //in qio.c
+  {
+        Lock    _lock;   //%
+        Block*  bfirst;  // buffer head
+        Block*  blast;   // buffer tail
+
+        int     len;     // bytes allocated to queue 
+        int     dlen;    // data bytes in queue 
+        int     limit;   // max bytes in queue 
+        :
+        :
+        void    (*kick)(void*); /* restart output */
+        void    (*bypass)(void*, Block*);       /* bypass queue altogether */
+        void*   arg;            /* argument to kick */
+
+        QLock   rlock;   // mutex for reading processes 
+        Rendez  rr;      // process waiting to read 
+        QLock   wlock;   // mutex for writing processes 
+        Rendez  wr;      // process waiting to write 
+        char    err[ERRMAX];
+  }
+\end{verbatim}
+}
+
+待ち行列の操作関数（一部）を以下に示す。大部分は、関数名から機能が推定できよう。
+
+{\small
+\begin{verbatim}
+    Block*      qbread(Queue*, int);
+    long        qbwrite(Queue*, Block*);
+    Queue*      qbypass(void (*)(void*, Block*), void*); //待ち行列を経ず直接呼び出しさせる
+    int         qcanread(Queue*);
+    void        qclose(Queue*);
+    int         qconsume(Queue*, void*, int);
+    Block*      qcopy(Queue*, int, ulong);
+    int         qdiscard(Queue*, int);
+    void        qflush(Queue*);
+    void        qfree(Queue*);
+    int         qfull(Queue*);
+    Block*      qget(Queue*);
+    void        qhangup(Queue*, char*);
+    int         qisclosed(Queue*);
+    int         qiwrite(Queue*, void*, int);
+    int         qlen(Queue*);
+    void        qlock(QLock*);
+    Queue*      qopen(int, int, void (*)(void*), void*);
+    int         qpass(Queue*, Block*);
+    int         qpassnolim(Queue*, Block*);
+    int         qproduce(Queue*, void*, int);
+    void        qputback(Queue*, Block*);
+    long        qread(Queue*, void*, int);
+    Block*      qremove(Queue*);
+    void        qreopen(Queue*);
+
+\end{verbatim}
+}
+
+
+
+次の【Ex.1】は、普通の待ち行列の例を示す。
+まず、``\verb|q1 = qopen(64*1024, Qmsg, 0, 0)|''を実行して待ち行列を生成している。
+送信側のスレッドは、``\verb|qbwrite(q1, bk1)|''でbk1を待ち行列q1 に挿入している。
+受信側のスレッドは、``\verb|bk2 = qbread(q1, size)|''を実行して size 分の
+データ{\tt q1}に挿入されるのを待ち、{\tt bk2} を返している。
+
+
+{\small
+\begin{verbatim}
+【Ex.1】
+    Queue *q1;
+    Block  *bk1, *bk2;
+    recvque = qopen(64*1024, Qmsg, 0, 0); //Max 64KBまでつなげる
+     :
+    n = qbwrite(q1, bk1);  // ブロックbk1をq1に挿入してすぐ戻る。
+     :
+    // 別のスレッド
+    bk2 = qbread(q1, size); // 自動的に待ち合わせをして q1 からブロックを取り出す。
+
+\end{verbatim}
+}
+
+
+次の【Ex.2】は、Queueという名前ではあるが待ち合わせは生じない。
+まず、``\verb|q1 = qbypass(foo, c)|''を実行して q2 を生成している。
+名前``bypass''から想定されるように、待ち行列はバイパスされ、
+``q1'' にデータが挿入されると、直ちに関数\verb|foo( )| が実行されることを意味する。 
+
+送信側のスレッドは、``\verb|qbwrite(q1, bk1)|''でbk1を待ち行列q1 に挿入している。
+これにより、直ちに\verb|foo( )|にブロックが引き継がれて実行される。
+
+{\small
+\begin{verbatim}
+【Ex.2】
+    Queue  *q2;
+    Block  *bk1, *bk2;
+    void *foo(...)
+    { .........  
+      .........
+    }
+     :
+    q2 = qbypass(foo, c);
+     :
+    n = qbwrite(q2, bk1);  // bk1をq2につないで、foo( )を呼び出す
+     :
+\end{verbatim}
+}
+
+
+
+{\bf \flushleft(3) 送信時の同期のとり方}
+
+
+\vspace{4cm}
+
+{\bf \flushleft(4) 受信時の同期のとり方}
+
+\vspace{4cm}
+
+{\bf \flushleft(5) 送信時の多重化（Multiplexing)}
+
+\vspace{4cm}
+
+
+{\bf \flushleft(5) 受信時の分配（Demultiplexing)}
+
+・プロトコル種別による分配
+　（IP層　→　UDP または　TCP または ....）
+
+
+・論理チャネルによる場分配
+　（TCP層での\{rocalIP, localPort, remoteIP, remotePort\}による分配。
+
+\vspace{4cm}
+
+
+
+
+\section{主要データの構造}
+
+{\bf \flushleft(1) Proto(col)テーブル}
+
+{\footnotesize
+\begin{verbatim}
+  struct Proto  // Multiplexedプロトコル毎に1個
+  {
+        QLock       _qlock;   //%
+        char*       name;     //プロトコル名
+        int         x;        //プロトコルインデックス
+        int         ipproto;  // IPプロトコルタイプ
+
+        char*       (*connect)(Conv*, char**, int);
+        char*       (*announce)(Conv*, char**, int);
+        char*       (*bind)(Conv*, char**, int);
+        int         (*state)(Conv*, char*, int);
+        void        (*create)(Conv*);
+        void        (*close)(Conv*);
+        void        (*rcv)(Proto*, Ipifc*, Block*);
+        char*       (*ctl)(Conv*, char**, int);
+        void        (*advise)(Proto*, Block*, char*);
+        int         (*stats)(Proto*, char*, int);
+        int         (*local)(Conv*, char*, int);
+        int         (*remote)(Conv*, char*, int);
+        int         (*inuse)(Conv*);
+        int         (*gc)(Proto*); 
+
+        Fs          *f;        
+        Conv        **conv;    //【注目】conversations の配列
+        int         ptclsize;  
+        int         nc;        //  conversations の総数
+        int         ac;
+        Qid         qid;       // qid for protocol directory 
+        ushort      nextport;
+        ushort      nextrport;
+
+        void        *priv;
+  };
+\end{verbatim}
+}
+
+{\tt Proto}テーブルは個々のプロトコルを洗わし、
+ TCP, UDP,,, といったプロトコル対応に存在する。
+\verb|(*conncect)(...)| から \verb|(*gc)(...)| は、
+プロトコル処理関数へのポインタであり、このように全てのプロトコルは
+統一したインタフェースを持っている。
+例えばパケットが受信されると、\verb|(*rcv)(...)| が呼ばれて、
+所定の処理を行う。
+
+プロトコルの重要役割の一つに多重化がある。
+つまり、一つの論理回線の中に複数の``論理チャネル''を載せることである。
+
+例えばTCP は多数の TCP接続を提供する。
+個々の TCP接続は、
+ ``\{ localIPaddress, localPort, remoteIPaddress, remortPort \}'' 
+により識別される。
+
+個々の``論理チャネル''(接続)を表すのが、次の{\tt Conv}テーブルである。
+{\tt Proto}テーブルは、\verb|Conv  **conv;| フィールドをたどって
+（一般にはハッシュを使う）、目的の{\tt Conv}テーブルにアクセスする。
+
+例えば TCP の場合、ハッシュを使って 
+\verb|Proto.conv|につながっている中から、
+ ``\{ localIPaddress, localPort, remoteIPaddress, remortPort \}''
+が一致するConvテーブルを見つける。
+\\
+
+
+{\bf \flushleft(2) Conv(ersation)テーブル}
+
+{\footnotesize
+\begin{verbatim}
+  struct Conv // 論理接続毎に1個
+  {
+        QLock _qlock;   
+        int     x;      // conversation index 
+        Proto*  p;      // プロトコルテーブルへ
+        ;
+        uint    ttl;     // max time to live 
+        uint    tos;     // type of service 
+        :
+        uchar   laddr[IPaddrlen];  // ローカルIPアドレス
+        uchar   raddr[IPaddrlen];  // リモートIPアドレス
+        ushort  lport;             // ローカルポート番号
+        ushort  rport;             // リモートポート番号
+        :
+        int     state;
+        /* udp specific */
+        int     headers;       // data src/dst headers in udp 
+        :
+        Conv*   incall;        // calls waiting to be listened for 
+        Conv*   next;
+
+        Queue*  rq;    // 受信待ち行列
+        Queue*  wq;    // 送信待ち行列（一般に待ち合わせ無）
+        Queue*  eq;    // エラーパケット
+        Queue*  sq;    // snooping queue 
+        :
+        Rendez  cr;
+        char    cerr[ERRMAX];
+        :
+        Rendez  listenr;
+        Ipmulti *multi;       // multicast bindings for this interface 
+        void*   ptcl;         // protocol specific stuff 
+        Route   *r;           // last route used 
+        ulong   rgen;         // routetable generation for *r 
+  };
+\end{verbatim}
+}
+
+{\tt Conv}テーブルは``論理チャネル''(接続)を表すテーブルである。
+(TCPの場合はTCP接続を意味する。
+UDP等の場合は接続というより端点と呼ぶ方がふさわしいかもしれない。)
+
+
+例えば TCP の場合、ハッシュ技法を使って \verb|Proto.conv| フィールドから
+ ``\{ localIPaddress, localPort, remoteIPaddress, remortPort \}''
+が一致する{\tt Conv}テーブルにアクセスする。
+
+
+{\tt Conv}テーブルの \verb|laddr, raddr, lport, rport| は、それぞれ
+ローカルIPアドレス、リモートIPアドレス, ローカルポート番号、リモートポート番号
+を表す。
+
+{\tt Conv}テーブルの\verb| Queue *rq; Queue *wq; | は、
+それぞれパケットの受信行列、送信行列である。
+この接続からデータを受けるとるには \verb|qbread(rq,..)|,
+送るには \verb|qbwite(wq, blkp)| を行う。
+なお、送信の場合は一般には待ち行列はバイパスされ、
+直ちに指定された関数が実行される。
+\\
+
+{\bf \flushleft(3) Fs (ファイルシステム）テーブル}
+
+{\footnotesize
+\begin{verbatim}
+  struct Fs　// IPプロトコルスタック毎に1個
+  {
+        RWlock _rwlock;    
+        int     dev;
+        int     np;
+        Proto*  p[Maxproto+1];    /* list of supported protocols */
+        Proto*  t2p[256];         /* vector of all protocols */
+        Proto*  ipifc;            /* kludge for ipifcremroute & ipifcaddroute */
+        Proto*  ipmux;            /* kludge for finding an ip multiplexor */
+
+        IP      *ip;
+        Ipselftab       *self;
+        Arp     *arp;
+        v6params        *v6p;
+
+        Route   *v4root[1<<Lroot];      /* v4 routing forest */
+        Route   *v6root[1<<Lroot];      /* v6 routing forest */
+        Route   *queue;                 /* used as temp when reinjecting routes */
+
+        Netlog  *alog;
+
+        char    ndb[1024];              /* an ndb entry for this interface */
+        int     ndbvers;
+        long    ndbmtime;
+  };
+\end{verbatim}
+}
+
+
+
+\section{IPサーバント devip (src/9/ip/devip.c)}
+
+
+プロトコルスタックの名前空間を構成し、IPサービスを提供するプログラムである。
+
+{\bf \flushleft(1) 名前空間}
+
+   Devipサーバントの提供する名前空間(/net にマウント)を、以下に示す。
+ここに \verb|<N>| は論理パス（TCPならばTCP接続) を意味し、
+\verb|0, 1, 2, ,,,| という数字が使われる。 
+{\tt Conv(ersation)}テーブルに対応する。
+
+{\small
+\begin{verbatim}
+ --net/ --+--- tcp/ --+--- clone
+          |           |--- stats
+          |           |--- <N>/ ----+---- ctl     <--- 制御
+          |           :             |---- data    <--- データの送受信
+          |           :             |---- err
+          |                         |---- listen
+          |                         |---- local
+          |                         |---- remote  
+          +--- udp/ --+--- clone  
+          |           |--- stats    
+          |           |--- <N>/ ----+---- ctl  
+          |           :             |---- data 
+          |           :             |---- err 
+          |                         |---- listen  
+          |                         |---- local 
+          |                         |---- remote 
+          +--- ipifc/ ....
+          |
+          +--- icmp/  ....
+          |
+          |--- arp
+          |--- ndb
+          |--- iproute
+          |--- ipselftab
+          |--- log    
+                      
+\end{verbatim}
+}
+
+{\bf \flushleft(2)データ構成}
+
+{\tt Fs, Proto, Conv}テーブルの関係を図\ref{fig:FsProtoConv}に示す。
+Fsテーブルは、プロトコルスタックを意味する。
+{\tt Fs} の {\tt p[プロトコルインデックス]} をたぐると、
+{\tt Proto(col)}テーブルが求まる。
+{\tt Proto}テーブルは、IP, TCP, UDP などといったプロトコルを意味する。
+{\tt Proto}テーブルの中身は、
+{\tt connect(), bind(), atate(), rcv()} などといったメソッドポインタと、
+{\tt Conv}テーブルにアクセスするための配列へのポインタ ``\verb|Conv **conv|'' 等である。
+この配列を論理パス番号 (\verb|<N>|) でインデックスすると、{\tt Conv}テーブルが求まる。
+
+Convテーブルは、論理パス(TCPの場合のTCP接続など)を表し、local/remoteのIPアドレス、
+local/remoteのポート番号等を記録している。
+データの送受信に関わる重要なフィールドとして、
+``\verb|Queue *rq;|''と``\verb|Queue *wq;|'' がある。
+``{\tt rq}''はデータを受信する時のアクセス点、
+``{\tt wq}''はデータを送信する時のアクセス点を意味する。
+``Queue''とあるとおり待ち行列の機能を持たせることができる（open時の設定）。
+
+
+\begin{figure}[htb]
+  \begin{center}
+   \epsfxsize=440pt
+   \epsfbox{fig/FsProtoConv.eps}
+    \caption{Fs, Proto, Convテーブルの関係}
+    \label{fig:FsProtoConv}
+  \end{center}
+\end{figure}
+
+
+{\bf \flushleft(3) 主な動作}
+
+(1)の名前空間の各要素への操作を実現している。
+例えば \verb|/net/tcp/5/data| への書き込みをおこなうと、
+TCP の該当{\tt Conv}テーブルの{\tt wq} への書き込みが行われる。
+ \verb|/net/tcp/5/data| への読み出しをおこなうと、
+TCP の該当{\tt Conv}テーブルの{\tt rq} からの読み出しが行われる。
+{\tt Conv}テーブルの{\tt rq, wq} フィールドは {\tt Queue}タイプであるが、
+必ずしも待ち行列経由を意味しない。
+待ち合わせ同期が不用な場合は、直接引き継がれる。
+
+
+
+
+\section{IP層 (src/9/ip/ip.c)}
+
+{\tt src/9/ip/ip.c}は分かりやすいプログラムなので、
+パケットの送信と受信に関するごく簡単な説明だけを行う。
+
+{\bf \flushleft(1) パケット送信: ipoput4()}
+
+例えばUDP層がパケットを送信する場合には、
+{\tt ip.c} の \verb|ipoput4()| 関数を呼び出す。
+
+ \verb|ipoput4()| は、\verb|v4lookup()|を呼んで出力方路を求める。
+電装媒体がEtherの場合は、
+そして ethermedium.c の\verb|etherbwrite()| を呼んでパケットを引き渡す。
+データサイズが制限サイズよりも大きい場合には、
+フラグメント分けをした上で、
+各フラグメント毎に繰り返される。
+
+Ether Card ビジーによる待ち合わせは、Ether ドライバ側で対処している。
+
+
+{\bf \flushleft(2) パケット受信: ipiput4()}
+
+Etherカードにパケットが到着すると、割り込みが発生する。
+Etherドライバの割り込みハンドラは、
+到着済みの全パケットを待ち行列(\verb|netif->in|) に挿入する。
+
+Etherドライバ側には、
+待ち行列(\verb|netif->in|) からパケットを読み出して、
+プロトコル処理を行う専用のスレッドが存在する。
+``{\tt src/9/ip/ethermedium.c}''が生成する``{\tt etherread4}スレッド''がこれである。
+このスレッドは, {\tt ethermedium.c}の \verb|etherread4()|を実行しており、
+待ち行列(\verb|netif->in|) からパケットを受けとると。
+``{\tt src/9/ip/ip.c}'' の \verb|ipiput4()|を呼び出す。
+
+このように入力側のプロトコル処理は、
+一般に``{\tt etherread4}スレッド''の制御下で行われる。
+
+\verb|ipiput4()| は、受信パケットの宛先IPアドレスが自分か否かを調べる。
+自分宛でない場合は、\verb|v4lookup()|を呼んで出力方路を求め, 
+\verb|ipoput4()| を呼んで転送させる。
+
+自分宛の場合は、もしフラグメント化されていたらまとめ直す。
+そしてパケットのプロトコル情報を見て、
+Protoテーブルにアクセスして、\verb|(*protocol->rcv)(...)| を呼ぶ。
+\verb|(*protocol->rcv)(...)| は、
+UDP の場合は udp.c の \verb|udpiput()|、
+TCP の場合は udp.c の \verb|tcpiput()| である。
+
+
+
+\section{ ARP  (src/9/ip/arp.c)}
+
+\vspace{4cm}
+
+
+\section{ ICMP (src/9/ip/icmp.c)}
+
+\vspace{4cm}
+
+
+\section{ UDP層   (src/9/ip/udp.c)} 
+ 
+src/9/ip/ip.c も 分かりやすいプログラムなので、
+パケットの送信と受信に関するごく簡単な説明だけを行う。
+
+
+{\bf \flushleft(1) Convテーブルと送信待ち行列、受信待ち行列}
+
+UDPは複数の論理チャネルを多重化している。
+各論理チャネルは Convテーブルで表現されている。
+IPアドレスとポート番号のハッシュを使って、
+目的のConvテーブルが求められる。
+
+Conv テーブルが持つ2大要素は送信待ち行列 \verb|Queue *wq;| と
+受信待ち行列 \verb|Queue *rq;| である。
+この論理チャネルにデータを送るには sq に書き込み、
+データを受信するには rq から読み出すことになる。
+\\
+
+{\bf \flushleft(2) パケット送信: udpkick4()}
+
+送信待ち行列 \verb|Queue *wq;| は \\
+``\verb|conv->wq = qbypass(udpkicj, c);|''
+として初期設定されている。
+つまり``{\tt wq}''にブロックを挿入する(\verb|qbwrite()|)と、
+（待ち合わせをせずに直ちに）\verb|udpkick()|関数が実行される。
+
+\verb|udpkick()| は、
+所定の検査や処理を行った上で。
+受けたデータブロックにUDP ヘッダーを追加して、
+{\tt ip.c} の \verb|ipoput4( )| にパケットを引き継ぐ。
+これで終わり。
+\\
+
+
+{\bf \flushleft(3) パケット受信: udpiput()}
+
+先に説明したように、入力側のプロトコル処理は、
+``{\tt etherread4}スレッド''の制御下で実行されている。
+
+IP層がUDPパケットを受信すると、\verb|(*proto->rcv)(...)|を呼び出す。
+UDPの場合は、\verb|(*proto->rcv)(...)|は \verb|udpiput(...)| である。
+
+
+
+\verb|udpiput()|は、
+IPアドレスとポート番号のハッシュを使って、
+目的のConvテーブルが求める。
+そしてConvテーブルの受信待ち行列にパケットを引き渡す.
+
+   \verb|qpass(conc->rq, bp);|
+\\
+
+
+    
+\section{ TCP層   (src/9/ip/tcp.c)}
+
+
+src/9/ip/tcp.c は高度の機能を実現しているので、
+当然ながら複雑なプログラムである。
+ここでは、パケットの送信と受信に関するごく簡単な説明だけを行う。
+
+
+{\bf \flushleft(1) Convテーブルと送信待ち行列、受信待ち行列}
+
+TCPは複数の論理チャネル(TCP接続)を多重化している。
+各論理チャネルは Convテーブルで表現されている。\
+ハッシュを使って、
+\{localIP, localPort, remoteIP, remotePort\} が一致する
+目的{\tt Conv}テーブルが求められる。
+
+Conv テーブルが持つ2大要素は送信待ち行列 \verb|Queue *wq;| と
+受信待ち行列 \verb|Queue *rq;| である。
+この論理チャネルにデータを送るには {\tt wq} に書き込み、
+データを受信するには {\tt rq} から読み出すことになる。
+\\
+
+{\bf \flushleft(2) パケット送信: tcpkick4()}
+
+送信待ち行列 \verb|Queue *wq;| は \\
+``\verb|conv->wq = qopen(96*1024, Qkick, tcpkic, c);|''
+として初期設定されている。
+
+つまり``wq''にブロックを挿入する(\verb|qbwrite()|)と、
+（待ち合わせをせずに直ちに）\verb|tcpkick()|関数が実行される。
+(UDPでは、 \verb|qbypass()|を呼んで同様な事を行っていた。)
+
+\verb|tcpkick()| は、
+Windowサイズの処理等を行った上で。
+\verb|tcpoput4()|に処理を引き継いでいる。
+\\
+
+
+{\bf \flushleft(3) パケット送信: tcpoput44()}
+
+\verb|tcpoput4()| は、送信待ち待ち行列からデータブロックを引き継ぎ、
+TCPヘッダ等の付加などの処理を行ったうえで、
+``{\tt ip.c}''の\verb|ipoput4()| を呼んで、IP層の処理を行わせている。
+
+
+
+{\bf \flushleft(4) パケット受信: tcpiput()}
+
+先に説明したように、入力側のプロトコル処理は、
+``{\tt etherread4スレッド}''の制御下で実行されている。
+
+IP層がTCPパケットを受信すると、\verb|(*proto->rcv)(...)|を呼び出す。
+TCPの場合は、\verb|(*proto->rcv)(...)|は \verb|tcpiput(...)| である。
+
+
+
+\verb|tcpiput()|は、
+ハッシュを使って、
+\{localIP, localPort, remoteIP, remotePort\} が一致する
+目的Convテーブルを求める。
+そして{\tt Conv}テーブルの受信待ち行列にパケットを引き渡す.
+
+   \verb|qpassnolim(conc->rq, bp);|
+
+
+
+
+
+
+\chapter{ Etherドライバ }
+
+\section{ プログラム構成}
+
+\vspace{4cm}
+
+\section{ devether サーバント(src/9/pc/devether.c) }
+
+\vspace{4cm}
+
+\section{ Lanceドライバ (src/9/pc/ether79c970.c)}
+
+\vspace{4cm}
+
+\section{  8139ドライバ (src/9/ip/arp.c)}
+
+\vspace{4cm}
+
+\section{ 物理アドレスアクセス}
+
+\vspace{4cm}
+
+
+
+
+
+\end{document}
+

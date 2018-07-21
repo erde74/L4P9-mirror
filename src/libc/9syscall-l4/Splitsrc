@@ -1,0 +1,28 @@
+#!/usr/bin/perl
+
+if ($#ARGV < 0) {die "Usage: Splitsrc <FileName>\n";}
+
+$file = $ARGV[0];    
+print "Input file is $file\n";
+
+
+open(SRCFILE, $file) || die "Can't open $file\n";
+
+while(<SRCFILE>){
+    if  ( m|^//# \s*([a-z0-9_]+)| ) {
+	$ofile = "$1_.c";
+	close(OFILE);
+	print  "$ofile \n";
+	open(OFILE, "> $ofile") || die "Can't open $file\n";
+	print OFILE "#include  \"sys.h\" \n";
+	print OFILE "#include  <u.h> \n";
+	print OFILE "#include  <libc.h> \n";
+	print OFILE "#include  \"ipc-l4.h\" \n";
+	print OFILE "#define  USE_MAPPING  1 \n";
+	print OFILE "\n";
+    };
+    print OFILE $_;
+}
+
+close(SRCFILE);
+close(OFILE);

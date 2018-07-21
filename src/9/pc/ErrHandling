@@ -1,0 +1,295 @@
+<><><><><> Error handling in P9 <><><><><>
+
+====== pc/dat.h ========
+struct Label
+{
+        ulong   sp;
+        ulong   pc;
+};
+ 
+
+====== port/portdat.h ==============
+       NERR =  64;
+
+struct Proc
+{
+        Label   sched;          
+        char    *kstack;        
+        Mach    *mach;          
+         :
+        Label   errlab[NERR];
+        char    *syserrstr;     /* last error from a system call, errbuf0 or 1 */
+        char    *errstr;     /* reason we're unwinding the error stack, errbuf1 or 0 */
+        char    errbuf0[ERRMAX];
+        char    errbuf1[ERRMAX];
+        char    genbuf[128];    /* buffer used e.g. for last name element from namec */
+        Chan    *slash;
+        Chan    *dot;
+         : 
+};
+
+
+===== pc/l.s ========
+
+TEXT gotolabel(SB), $0
+        MOVL    label+0(FP), AX
+        MOVL    0(AX), SP        /* restore sp */
+        MOVL    4(AX), AX        /* put return pc on the stack */
+        MOVL    AX, 0(SP)
+        MOVL    $1, AX           /* return 1 */
+        RET
+
+
+------------------------------------
+TEXT setlabel(SB), $0
+        MOVL    label+0(FP), AX
+        MOVL    SP, 0(AX)        /* store sp */
+        MOVL    0(SP), BX        /* store return pc */
+        MOVL    BX, 4(AX)
+        MOVL    $0, AX           /* return 0 */
+        RET
+
+
+
+==== 9/pc/fns.h =============
+
+#define  waserror()   (up->nerrlab++, setlabel(&up->errlab[up->nerrlab-1]))
+
+
+==== 9/port/portfns.h ===========
+
+#define  poperror()   up->nerrlab--
+
+
+====  9/port/proc.c ==============
+
+void
+error(char *err)
+{
+        spllo();
+ 
+        assert(up->nerrlab < NERR);
+        kstrcpy(up->errstr, err, ERRMAX);
+        setlabel(&up->errlab[NERR-1]);
+        nexterror();
+}
+ 
+void
+nexterror(void)
+{
+        gotolabel(&up->errlab[--up->nerrlab]);
+}
+ 
+
+====================================================
+
+ 	if (!waserror() ) {
+		ret = systab[scallnr](up->s.args);
+		poperror();
+	else{
+		ERROR SYORI
+		e = up->syserrstr;
+		up->syserrstr = up->errstr;
+		up->errstr = e;
+		...
+	}
+
+
+===== libc/386/setjmp.s ==================
+
+TEXT    longjmp(SB), $0
+        MOVL    r+4(FP), AX
+        CMPL    AX, $0
+        JNE     ok              /* ansi: "longjmp(0) => longjmp(1)" */
+        MOVL    $1, AX          /* bless their pointed heads */
+ok:     MOVL    l+0(FP), BX
+        MOVL    0(BX), SP       /* restore sp */
+        MOVL    4(BX), BX       /* put return pc on the stack */
+        MOVL    BX, 0(SP)
+        RET
+ 
+TEXT    setjmp(SB), $0
+        MOVL    l+0(FP), AX
+        MOVL    SP, 0(AX)       /* store sp */
+        MOVL    0(SP), BX       /* store return pc */
+        MOVL    BX, 4(AX)
+        MOVL    $0, AX          /* return 0 */
+        RET
+
+
+<><><><> SYSCALL <><><>
+
+======= Plan9 original =====
+void syscall(Ureg* ureg)
+{
+        char *e;
+        ulong   sp;
+        long    ret;
+        int     i, s;
+        ulong scallnr;
+                                                                                
+        if((ureg->cs & 0xFFFF) != UESEL)
+                panic("syscall: cs 0x%4.4luX\n", ureg->cs);
+                                                                                
+        cycles(&up->kentry);
+                                                                                
+        m->syscall++;
+        up->insyscall = 1;
+        up->pc = ureg->pc;
+        up->dbgreg = ureg;
+                                                                                
+        if(up->procctl == Proc_tracesyscall){
+                up->procctl = Proc_stopme;
+                procctl(up);
+        }
+                                                                                
+        scallnr = ureg->ax;
+        up->scallnr = scallnr;
+        if(scallnr == RFORK && up->fpstate == FPactive){
+                fpsave(&up->fpsave);
+                up->fpstate = FPinactive;
+        }
+        spllo();
+                                                                                
+        sp = ureg->usp;
+        up->nerrlab = 0;
+        ret = -1;
+        if(!waserror()){
+                if(scallnr >= nsyscall || systab[scallnr] == 0){
+                        pprint("bad sys call number %d pc %lux\n",
+                                scallnr, ureg->pc);
+                        postnote(up, 1, "sys: bad sys call", NDebug);
+                        error(Ebadarg);
+                }
+                                                                                
+                if(sp<(USTKTOP-BY2PG) || sp>(USTKTOP-sizeof(Sargs)-BY2WD))
+                        validaddr(sp, sizeof(Sargs)+BY2WD, 0);
+                                                                                
+                up->s = *((Sargs*)(sp+BY2WD));
+                up->psstate = sysctab[scallnr];
+                                                                                
+                ret = systab[scallnr](up->s.args);
+                poperror();
+        }else{
+                /* failure: save the error buffer for errstr */
+                e = up->syserrstr;
+                up->syserrstr = up->errstr;
+                up->errstr = e;
+                if(0 && up->pid == 1)
+                        print("syscall %lud error %s\n", scallnr, up->syserrstr);
+        }
+        if(up->nerrlab){
+                print("bad errstack [%lud]: %d extra\n", scallnr, up->nerrlab);
+                for(i = 0; i < NERR; i++)
+                        print("sp=%lux pc=%lux\n",
+                                up->errlab[i].sp, up->errlab[i].pc);
+                panic("error stack");
+        }
+                                                                                          
+        /*
+         *  Put return value in frame.  On the x86 the syscall is
+         *  just another trap and the return value from syscall is
+         *  ignored.  On other machines the return value is put into
+         *  the results register by caller of syscall.
+         */
+        ureg->ax = ret;
+                                                                                          
+        if(up->procctl == Proc_tracesyscall){
+                up->procctl = Proc_stopme;
+                s = splhi();
+                procctl(up);
+                splx(s);
+        }
+                                                                                          
+        up->insyscall = 0;
+        up->psstate = 0;
+                                                                                          
+        if(scallnr == NOTED)
+                noted(ureg, *(ulong*)(sp+BY2WD));
+                                                                                          
+        if(scallnr!=RFORK && (up->procctl || up->nnote)){
+                splhi();
+                notify(ureg);
+        }
+        /* if we delayed sched because we held a lock, sched now */
+        if(up->delaysched)
+                sched();
+        kexit(ureg);
+}
+
+======== LP49 ==================
+
+void service_loop()
+{
+    L4_MsgTag_t    tag;
+    L4_Msg_t       _mrs;
+    L4_MsgBuffer_t   _brs;  // to specify receive string
+    L4_StringItem_t  si1;
+    Worker_t      *wp;
+    int            syscallnr;
+    unsigned       pattern; //[ 0| 0| 0|p4|p3|p2|p1|p0]
+    int    inx, argx, attr, len, strx, err;
+                                                                                      
+    DBGBRK("\n<><> SERVICE LOOP: %X <><>\n", L4_Myself().raw);
+    //    workerpool_init(4);
+                                                                                      
+    extern void post_nextproc(int);
+    post_nextproc(0);
+                                                                                      
+    while (1) {
+        L4_MsgBufferClear(&_brs);
+        si1 = L4_StringItem(512, strbuf);
+        L4_MsgBufferAppendSimpleRcvString(&_brs, si1);
+        strbuf[0] = 0;
+        L4_AcceptStrings(L4_StringItemsAcceptor, &_brs);
+        inx = 1;
+        argx = strx = 0;
+                                                                                      
+        tag = L4_Wait(&client);
+                                                                                      
+        L4_MsgStore(tag, &_mrs);
+        syscallnr = L4_Label(tag);                // MR[0]
+        L4_StoreMR(inx++, (L4_Word_t*)&pattern);  // MR[1]
+                                                                                      
+        DBGPRN("\n<><>SVR Label= %d pattern= %X <><> \n", syscallnr, pattern);
+                                                                                      
+        while ((attr = (pattern & 0x0F))) {
+          switch (attr) {
+          case _I:  // Immediate data param.
+          case _A:  // Address param.
+            L4_StoreMR(inx, &args[argx]);
+            DBGPRN("SVR ARG[%d] %d  \n", argx, args[argx]);
+            break;
+                                                                                      
+          case _S:  // String parram.
+            L4_StoreMR(inx, (L4_Word_t*)&len);
+            args[argx] = (unsigned)&strbuf[strx];
+            DBGPRN("SVR ARG[%d] %s : %d \n", argx,  args[argx], len);
+            strx += len;
+          }
+          pattern = pattern >> 4;
+          inx++;  argx++;
+        }
+                                                                                      
+        up = tid2pcb(client);
+        if (syscallnr >= nsyscall)
+          err = -1;  // EBADCALL;
+        else
+          err = (*systab[syscallnr])(args);
+        //if (dont_reply) continue;       /* no reply for EXIT and WAIT */
+        //if (syscallnr == EXEC && error == OK) continue;
+        // reply(client, 1, 1);
+#if 1
+        L4_LoadMR(0, 1);
+        L4_LoadMR(1, err);      DBGBRK("## %d \n", err);
+#else
+        L4_MsgClear(&_mrs);
+        L4_Set_MsgLabel(&_mrs, 64);  // reply label
+        L4_MsgAppendWord(&_mrs, err);  // result
+        L4_MsgLoad(&_mrs);
+#endif
+        tag = L4_Reply(client);
+        // if (L4_IpcFailed(tag))  ;
+    }
+}
+
